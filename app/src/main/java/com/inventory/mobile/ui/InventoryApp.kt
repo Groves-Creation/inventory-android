@@ -81,7 +81,7 @@ import java.time.YearMonth
 import java.util.UUID
 
 private enum class Screen(val label: String) {
-    Home("Home"), Items("Items"), Find("Find"), Counts("Count"), More("More"), Labels("Labels"), Variances("Variances"), Reports("Reports"), Audit("Audit"), Admin("Admin")
+    Home("Home"), Items("Items"), Find("Find"), Counts("Count"), More("More"), Settings("Settings"), Labels("Labels"), Variances("Variances"), Reports("Reports"), Audit("Audit"), Admin("Admin")
 }
 
 private val pilotLightColors = lightColorScheme(
@@ -116,13 +116,28 @@ fun InventoryApp(container: AppContainer, onInstallUpdate: (AvailableUpdate) -> 
     val view = LocalView.current
     val colorScheme = if (darkMode) pilotDarkColors else pilotLightColors
     var availableUpdate by remember { mutableStateOf<AvailableUpdate?>(null) }
+    var checkingForUpdate by remember { mutableStateOf(false) }
+    var updateCheckMessage by remember { mutableStateOf<String?>(null) }
+    fun checkForUpdates(showResult: Boolean) {
+        scope.launch {
+            checkingForUpdate = true
+            updateCheckMessage = null
+            runCatching {
+                GitHubReleaseChecker.findAvailableUpdate(
+                    repository = BuildConfig.UPDATE_REPOSITORY,
+                    currentVersion = BuildConfig.VERSION_NAME,
+                )
+            }.onSuccess { update ->
+                availableUpdate = update
+                if (update == null && showResult) updateCheckMessage = "You're up to date."
+            }.onFailure {
+                if (showResult) updateCheckMessage = "Couldn't check for updates. Check your connection and try again."
+            }
+            checkingForUpdate = false
+        }
+    }
     LaunchedEffect(Unit) {
-        availableUpdate = runCatching {
-            GitHubReleaseChecker.findAvailableUpdate(
-                repository = BuildConfig.UPDATE_REPOSITORY,
-                currentVersion = BuildConfig.VERSION_NAME,
-            )
-        }.getOrNull()
+        checkForUpdates(showResult = false)
     }
     SideEffect {
         val activity = view.context as? ComponentActivity ?: return@SideEffect
@@ -158,7 +173,16 @@ fun InventoryApp(container: AppContainer, onInstallUpdate: (AvailableUpdate) -> 
                 scope.launch { container.sessionStore.saveStore(store) }
             }
         } else {
-            InventoryShell(user!!, selectedStore!!, container, darkMode, toggleDarkMode)
+            InventoryShell(
+                user!!,
+                selectedStore!!,
+                container,
+                darkMode,
+                toggleDarkMode,
+                checkingForUpdate,
+                updateCheckMessage,
+                onCheckForUpdates = { checkForUpdates(showResult = true) },
+            )
         }
         availableUpdate?.let { update ->
             AlertDialog(
@@ -269,7 +293,16 @@ private fun LoginScreen(repository: InventoryRepository, darkMode: Boolean, onTo
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun InventoryShell(user: UserDto, store: StoreDto, container: AppContainer, darkMode: Boolean, onToggleDarkMode: () -> Unit) {
+private fun InventoryShell(
+    user: UserDto,
+    store: StoreDto,
+    container: AppContainer,
+    darkMode: Boolean,
+    onToggleDarkMode: () -> Unit,
+    checkingForUpdate: Boolean,
+    updateCheckMessage: String?,
+    onCheckForUpdates: () -> Unit,
+) {
     var screen by remember { mutableStateOf(Screen.Home) }
     var showingExitChoices by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
@@ -308,6 +341,7 @@ private fun InventoryShell(user: UserDto, store: StoreDto, container: AppContain
                 Screen.Find -> FindScreen(user, store, container.repository)
                 Screen.Counts -> CountsScreen(user, store, container.repository, container.queueSync, snackbar)
                 Screen.More -> MoreScreen(user) { screen = it }
+                Screen.Settings -> SettingsScreen(checkingForUpdate, updateCheckMessage, onCheckForUpdates)
                 Screen.Labels -> LabelsScreen(user, store.id, container.repository, snackbar)
                 Screen.Variances -> VariancesScreen(user, store.id, container.repository, snackbar)
                 Screen.Reports -> ReportsScreen(user, store.id, container.repository, snackbar)
@@ -516,6 +550,7 @@ private fun QueuedCountCard(entry: QueuedCount, queue: CountQueueSync, repositor
 @Composable
 private fun MoreScreen(user: UserDto, onNavigate: (Screen) -> Unit) {
     val choices = buildList {
+        add(Screen.Settings)
         add(Screen.Labels)
         if (user.canManage()) addAll(listOf(Screen.Variances, Screen.Reports, Screen.Audit))
         if (user.role == "owner") add(Screen.Admin)
@@ -524,6 +559,18 @@ private fun MoreScreen(user: UserDto, onNavigate: (Screen) -> Unit) {
         items(choices) { target ->
             OutlinedButton(onClick = { onNavigate(target) }, modifier = Modifier.fillMaxWidth()) { Text(target.label) }
         }
+    }
+}
+
+@Composable
+private fun SettingsScreen(checkingForUpdate: Boolean, updateCheckMessage: String?, onCheckForUpdates: () -> Unit) {
+    Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Settings", style = MaterialTheme.typography.headlineSmall)
+        Text("Version ${BuildConfig.VERSION_NAME}")
+        Button(enabled = !checkingForUpdate, onClick = onCheckForUpdates) {
+            Text(if (checkingForUpdate) "Checking for updates…" else "Check for updates")
+        }
+        updateCheckMessage?.let { Text(it, color = MaterialTheme.colorScheme.secondary) }
     }
 }
 

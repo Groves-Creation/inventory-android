@@ -5,6 +5,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
+import java.io.IOException
 import kotlinx.serialization.json.Json
 import java.net.HttpURLConnection
 import java.net.URL
@@ -27,7 +28,9 @@ object GitHubReleaseChecker {
             connection.setRequestProperty("Accept", "application/vnd.github+json")
             connection.setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
             connection.setRequestProperty("User-Agent", "Inventory-Android")
-            if (connection.responseCode !in 200..299) return@withContext null
+            if (connection.responseCode !in 200..299) {
+                throw IOException("GitHub returned HTTP ${connection.responseCode} while checking for updates")
+            }
 
             val releases = connection.inputStream.bufferedReader().use { reader ->
                 json.decodeFromString<List<GitHubRelease>>(reader.readText())
