@@ -2,7 +2,10 @@
 .kotlin/
 .idea/
 local.properties
+keystore.properties
+key.properties
+*.jks
+*.keystore
 captures/
 **/build/
 *.iml
-
