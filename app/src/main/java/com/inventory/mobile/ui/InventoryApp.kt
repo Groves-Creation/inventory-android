@@ -1,6 +1,8 @@
 package com.inventory.mobile.ui
 
-import android.app.Activity
+import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -65,7 +67,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.core.view.WindowCompat
 import com.inventory.mobile.AppContainer
 import com.inventory.mobile.BuildConfig
 import com.inventory.mobile.data.CountQueueSync
@@ -126,11 +127,17 @@ fun InventoryApp(container: AppContainer, onInstallUpdate: (AvailableUpdate) -> 
         }.getOrNull()
     }
     SideEffect {
-        val window = (view.context as? Activity)?.window ?: return@SideEffect
-        window.statusBarColor = colorScheme.background.toArgb()
-        window.navigationBarColor = colorScheme.surface.toArgb()
-        WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkMode
-        WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !darkMode
+        val activity = view.context as? ComponentActivity ?: return@SideEffect
+        activity.enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(
+                lightScrim = colorScheme.background.toArgb(),
+                darkScrim = colorScheme.background.toArgb(),
+            ) { darkMode },
+            navigationBarStyle = SystemBarStyle.auto(
+                lightScrim = colorScheme.surface.toArgb(),
+                darkScrim = colorScheme.surface.toArgb(),
+            ) { darkMode },
+        )
     }
     val toggleDarkMode = {
         scope.launch { container.sessionStore.saveDarkMode(!darkMode) }
