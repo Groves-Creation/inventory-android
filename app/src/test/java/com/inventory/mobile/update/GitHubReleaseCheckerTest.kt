@@ -19,4 +19,17 @@ class GitHubReleaseCheckerTest {
     fun `does not offer the current version`() {
         assertFalse(GitHubReleaseChecker.isNewer("v0.1.0-pilot", "0.1.0-pilot"))
     }
+
+    @Test
+    fun `stable channel accepts only stable Master releases`() {
+        assertTrue(GitHubReleaseChecker.belongsToChannel("v0.3.1", isPrerelease = false, channel = UpdateChannel.Stable))
+        assertFalse(GitHubReleaseChecker.belongsToChannel("v0.3.1-0721260230-brut", isPrerelease = true, channel = UpdateChannel.Stable))
+    }
+
+    @Test
+    fun `beta brut channel accepts only Brutalist prereleases`() {
+        assertTrue(GitHubReleaseChecker.belongsToChannel("v0.3.1-0721260230-brut", isPrerelease = true, channel = UpdateChannel.BetaBrut))
+        assertFalse(GitHubReleaseChecker.belongsToChannel("v0.3.1", isPrerelease = false, channel = UpdateChannel.BetaBrut))
+        assertFalse(GitHubReleaseChecker.belongsToChannel("v0.3.1-pilot", isPrerelease = true, channel = UpdateChannel.BetaBrut))
+    }
 }
