@@ -89,6 +89,45 @@ private enum class Screen(val label: String) {
     Home("Home"), Items("Items"), Find("Find"), Counts("Count"), More("More"), Settings("Settings"), Labels("Labels"), Variances("Variances"), Reports("Reports"), Audit("Audit"), Admin("Admin")
 }
 
+private enum class AppBackground(val light: Int, val dark: Int) {
+    Login(R.drawable.background_login_light, R.drawable.background_login_dark),
+    Store(R.drawable.background_store_light, R.drawable.background_store_dark),
+    Home(R.drawable.background_home_light, R.drawable.background_home_dark),
+    Items(R.drawable.background_items_light, R.drawable.background_items_dark),
+    Find(R.drawable.background_find_light, R.drawable.background_find_dark),
+    Count(R.drawable.background_count_light, R.drawable.background_count_dark),
+    More(R.drawable.background_more_light, R.drawable.background_more_dark),
+    Settings(R.drawable.background_settings_light, R.drawable.background_settings_dark),
+    Labels(R.drawable.background_labels_light, R.drawable.background_labels_dark),
+    Variances(R.drawable.background_variances_light, R.drawable.background_variances_dark),
+    Reports(R.drawable.background_reports_light, R.drawable.background_reports_dark),
+    Audit(R.drawable.background_audit_light, R.drawable.background_audit_dark),
+}
+
+private fun Screen.background() = when (this) {
+    Screen.Home -> AppBackground.Home
+    Screen.Items -> AppBackground.Items
+    Screen.Find -> AppBackground.Find
+    Screen.Counts -> AppBackground.Count
+    Screen.More -> AppBackground.More
+    Screen.Settings, Screen.Admin -> AppBackground.Settings
+    Screen.Labels -> AppBackground.Labels
+    Screen.Variances -> AppBackground.Variances
+    Screen.Reports -> AppBackground.Reports
+    Screen.Audit -> AppBackground.Audit
+}
+
+@Composable
+private fun ScreenBackground(background: AppBackground, darkMode: Boolean, modifier: Modifier = Modifier) {
+    Image(
+        painter = painterResource(if (darkMode) background.dark else background.light),
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = modifier.fillMaxSize(),
+        alpha = if (darkMode) 0.48f else 0.62f,
+    )
+}
+
 private val pilotLightColors = lightColorScheme(
     primary = Color(0xFF146C5A),
     secondary = Color(0xFF52616B),
@@ -225,15 +264,7 @@ private fun StoreSelectionScreen(
         loading = false
     }
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        if (!darkMode) {
-            Image(
-                painter = painterResource(R.drawable.inventory_background),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-                alpha = 0.72f,
-            )
-        }
+        ScreenBackground(AppBackground.Store, darkMode)
         IconButton(onClick = onToggleDarkMode, modifier = Modifier.align(Alignment.TopEnd)) {
             Icon(if (darkMode) Icons.Default.LightMode else Icons.Default.DarkMode, if (darkMode) "Switch to light mode" else "Switch to dark mode")
         }
@@ -272,21 +303,13 @@ private fun LoginScreen(repository: InventoryRepository, darkMode: Boolean, onTo
         runCatching { repository.loginUsers() }.onSuccess { users = it }.onFailure { error = it.message }
     }
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        if (!darkMode) {
-            Image(
-                painter = painterResource(R.drawable.inventory_background),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-                alpha = 0.72f,
-            )
-        }
+        ScreenBackground(AppBackground.Login, darkMode)
         IconButton(onClick = onToggleDarkMode, modifier = Modifier.align(Alignment.TopEnd)) {
             Icon(if (darkMode) Icons.Default.LightMode else Icons.Default.DarkMode, if (darkMode) "Switch to light mode" else "Switch to dark mode")
         }
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Inventory", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Text("LIT Super Smoke Shop", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Text("Internal pilot — PIN access is not a production security boundary.", color = MaterialTheme.colorScheme.error)
                 Text("Choose your name")
                 users.forEach { name ->
@@ -336,7 +359,10 @@ private fun InventoryShell(
     var showingExitChoices by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    Scaffold(
+    Box(Modifier.fillMaxSize()) {
+        ScreenBackground(screen.background(), darkMode)
+        Scaffold(
+        containerColor = Color.Transparent,
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
@@ -377,6 +403,7 @@ private fun InventoryShell(
                 Screen.Audit -> AuditScreen(user, store.id, container.repository, snackbar)
                 Screen.Admin -> AdminScreen(user, container.repository, snackbar)
             }
+        }
         }
     }
     if (showingExitChoices) {
