@@ -67,6 +67,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.view.WindowCompat
 import com.inventory.mobile.AppContainer
+import com.inventory.mobile.BuildConfig
 import com.inventory.mobile.data.CountQueueSync
 import com.inventory.mobile.data.InventoryRepository
 import com.inventory.mobile.data.ItemDto
@@ -75,6 +76,8 @@ import com.inventory.mobile.data.QueuedCount
 import com.inventory.mobile.data.SearchGroupDto
 import com.inventory.mobile.data.StoreDto
 import com.inventory.mobile.data.UserDto
+import com.inventory.mobile.update.AvailableUpdate
+import com.inventory.mobile.update.GitHubReleaseChecker
 import kotlinx.coroutines.launch
 import java.time.YearMonth
 import java.util.UUID
@@ -106,13 +109,22 @@ private val pilotDarkColors = darkColorScheme(
 )
 
 @Composable
-fun InventoryApp(container: AppContainer) {
+fun InventoryApp(container: AppContainer, onInstallUpdate: (AvailableUpdate) -> Unit) {
     val user by container.sessionStore.user.collectAsStateWithLifecycle(initialValue = null)
     val savedDarkMode by container.sessionStore.darkMode.collectAsStateWithLifecycle(initialValue = null)
     val darkMode = savedDarkMode ?: isSystemInDarkTheme()
     val scope = rememberCoroutineScope()
     val view = LocalView.current
     val colorScheme = if (darkMode) pilotDarkColors else pilotLightColors
+    var availableUpdate by remember { mutableStateOf<AvailableUpdate?>(null) }
+    LaunchedEffect(Unit) {
+        availableUpdate = runCatching {
+            GitHubReleaseChecker.findAvailableUpdate(
+                repository = BuildConfig.UPDATE_REPOSITORY,
+                currentVersion = BuildConfig.VERSION_NAME,
+            )
+        }.getOrNull()
+    }
     SideEffect {
         val window = (view.context as? Activity)?.window ?: return@SideEffect
         window.statusBarColor = colorScheme.background.toArgb()
@@ -135,6 +147,20 @@ fun InventoryApp(container: AppContainer) {
             }
         } else {
             InventoryShell(user!!, container, darkMode, toggleDarkMode)
+        }
+        availableUpdate?.let { update ->
+            AlertDialog(
+                onDismissRequest = { availableUpdate = null },
+                title = { Text("Update available") },
+                text = { Text("Inventory ${update.versionName} is ready to install.") },
+                confirmButton = {
+                    Button(onClick = {
+                        availableUpdate = null
+                        onInstallUpdate(update)
+                    }) { Text("Update") }
+                },
+                dismissButton = { TextButton(onClick = { availableUpdate = null }) { Text("Not now") } },
+            )
         }
     }
 }

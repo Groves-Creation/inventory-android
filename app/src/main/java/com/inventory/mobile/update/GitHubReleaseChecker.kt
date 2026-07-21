@@ -1,0 +1,108 @@
+package com.inventory.mobile.update
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
+import java.net.HttpURLConnection
+import java.net.URL
+
+data class AvailableUpdate(
+    val versionName: String,
+    val downloadUrl: String,
+)
+
+object GitHubReleaseChecker {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    suspend fun findAvailableUpdate(repository: String, currentVersion: String): AvailableUpdate? = withContext(Dispatchers.IO) {
+        val installedVersion = ReleaseVersion.parse(currentVersion) ?: return@withContext null
+        val connection = (URL("https://api.github.com/repos/$repository/releases?per_page=20").openConnection() as HttpURLConnection)
+        try {
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 10_000
+            connection.readTimeout = 10_000
+            connection.setRequestProperty("Accept", "application/vnd.github+json")
+            connection.setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
+            connection.setRequestProperty("User-Agent", "Inventory-Android")
+            if (connection.responseCode !in 200..299) return@withContext null
+
+            val releases = connection.inputStream.bufferedReader().use { reader ->
+                json.decodeFromString<List<GitHubRelease>>(reader.readText())
+            }
+            releases
+                .mapNotNull { release ->
+                    val version = ReleaseVersion.parse(release.tagName) ?: return@mapNotNull null
+                    val asset = release.assets.firstOrNull { it.name.startsWith("Inventory-") && it.name.endsWith(".apk", ignoreCase = true) }
+                        ?: return@mapNotNull null
+                    ReleaseCandidate(version, AvailableUpdate(version.toString(), asset.downloadUrl))
+                }
+                .filter { it.version > installedVersion }
+                .maxByOrNull { it.version }
+                ?.update
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    internal fun isNewer(candidate: String, current: String): Boolean {
+        val candidateVersion = ReleaseVersion.parse(candidate) ?: return false
+        val currentVersion = ReleaseVersion.parse(current) ?: return false
+        return candidateVersion > currentVersion
+    }
+
+    @Serializable
+    private data class GitHubRelease(
+        @SerialName("tag_name") val tagName: String,
+        val assets: List<GitHubAsset>,
+    )
+
+    @Serializable
+    private data class GitHubAsset(
+        val name: String,
+        @SerialName("browser_download_url") val downloadUrl: String,
+    )
+
+    private data class ReleaseCandidate(
+        val version: ReleaseVersion,
+        val update: AvailableUpdate,
+    )
+}
+
+private data class ReleaseVersion(
+    val major: Int,
+    val minor: Int,
+    val patch: Int,
+    val qualifier: String?,
+) : Comparable<ReleaseVersion> {
+    override fun compareTo(other: ReleaseVersion): Int {
+        compareValuesBy(this, other, ReleaseVersion::major, ReleaseVersion::minor, ReleaseVersion::patch)
+            .takeIf { it != 0 }
+            ?.let { return it }
+        if (qualifier == other.qualifier) return 0
+        if (qualifier == null) return 1
+        if (other.qualifier == null) return -1
+        return qualifier.compareTo(other.qualifier)
+    }
+
+    override fun toString(): String = buildString {
+        append("$major.$minor.$patch")
+        qualifier?.let { append("-$it") }
+    }
+
+    companion object {
+        private val pattern = Regex("^v?(\\d+)\\.(\\d+)\\.(\\d+)(?:-([0-9A-Za-z.-]+))?$")
+
+        fun parse(value: String): ReleaseVersion? {
+            val match = pattern.matchEntire(value) ?: return null
+            return ReleaseVersion(
+                major = match.groupValues[1].toInt(),
+                minor = match.groupValues[2].toInt(),
+                patch = match.groupValues[3].toInt(),
+                qualifier = match.groupValues[4].ifBlank { null },
+            )
+        }
+    }
+}
