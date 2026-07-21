@@ -1,0 +1,98 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "700824e226f27ede0092c00132df0fc8",
+    "entities": [
+      {
+        "tableName": "queued_counts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`requestId` TEXT NOT NULL, `userId` TEXT NOT NULL, `storeId` TEXT NOT NULL, `itemId` TEXT NOT NULL, `itemName` TEXT NOT NULL, `countedQty` REAL NOT NULL, `note` TEXT, `month` TEXT NOT NULL, `expectedCountedAt` TEXT, `state` TEXT NOT NULL, `conflictQty` REAL, `conflictAt` TEXT, `conflictBy` TEXT, PRIMARY KEY(`requestId`))",
+        "fields": [
+          {
+            "fieldPath": "requestId",
+            "columnName": "requestId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userId",
+            "columnName": "userId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "storeId",
+            "columnName": "storeId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "itemId",
+            "columnName": "itemId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "itemName",
+            "columnName": "itemName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "countedQty",
+            "columnName": "countedQty",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "note",
+            "columnName": "note",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "month",
+            "columnName": "month",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "expectedCountedAt",
+            "columnName": "expectedCountedAt",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "conflictQty",
+            "columnName": "conflictQty",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "conflictAt",
+            "columnName": "conflictAt",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "conflictBy",
+            "columnName": "conflictBy",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "requestId"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '700824e226f27ede0092c00132df0fc8')"
+    ]
+  }
+}
