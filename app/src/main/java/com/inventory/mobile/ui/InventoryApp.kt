@@ -9,10 +9,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -32,7 +30,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -112,6 +109,7 @@ private val pilotDarkColors = darkColorScheme(
 @Composable
 fun InventoryApp(container: AppContainer, onInstallUpdate: (AvailableUpdate) -> Unit) {
     val user by container.sessionStore.user.collectAsStateWithLifecycle(initialValue = null)
+    val selectedStore by container.sessionStore.store.collectAsStateWithLifecycle(initialValue = null)
     val savedDarkMode by container.sessionStore.darkMode.collectAsStateWithLifecycle(initialValue = null)
     val darkMode = savedDarkMode ?: isSystemInDarkTheme()
     val scope = rememberCoroutineScope()
@@ -150,10 +148,17 @@ fun InventoryApp(container: AppContainer, onInstallUpdate: (AvailableUpdate) -> 
             }
         } else if (user == null) {
             LoginScreen(container.repository, darkMode, toggleDarkMode) { loggedIn ->
-                scope.launch { container.sessionStore.save(loggedIn) }
+                scope.launch {
+                    container.sessionStore.save(loggedIn)
+                    container.sessionStore.saveStore(null)
+                }
+            }
+        } else if (selectedStore == null) {
+            StoreSelectionScreen(user!!, container.repository, darkMode, toggleDarkMode) { store ->
+                scope.launch { container.sessionStore.saveStore(store) }
             }
         } else {
-            InventoryShell(user!!, container, darkMode, toggleDarkMode)
+            InventoryShell(user!!, selectedStore!!, container, darkMode, toggleDarkMode)
         }
         availableUpdate?.let { update ->
             AlertDialog(
@@ -168,6 +173,45 @@ fun InventoryApp(container: AppContainer, onInstallUpdate: (AvailableUpdate) -> 
                 },
                 dismissButton = { TextButton(onClick = { availableUpdate = null }) { Text("Not now") } },
             )
+        }
+    }
+}
+
+@Composable
+private fun StoreSelectionScreen(
+    user: UserDto,
+    repository: InventoryRepository,
+    darkMode: Boolean,
+    onToggleDarkMode: () -> Unit,
+    onSelect: (StoreDto) -> Unit,
+) {
+    var stores by remember { mutableStateOf<List<StoreDto>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(user.id) {
+        loading = true
+        runCatching { repository.stores(user.id) }
+            .onSuccess { stores = it }
+            .onFailure { error = it.message ?: "Unable to load stores" }
+        loading = false
+    }
+    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+        IconButton(onClick = onToggleDarkMode, modifier = Modifier.align(Alignment.TopEnd)) {
+            Icon(if (darkMode) Icons.Default.LightMode else Icons.Default.DarkMode, if (darkMode) "Switch to light mode" else "Switch to dark mode")
+        }
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Choose a store", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Text("You will stay in this store until you switch stores or log out.")
+                if (loading) CircularProgressIndicator()
+                stores.forEach { store ->
+                    OutlinedButton(onClick = { onSelect(store) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(store.name)
+                    }
+                }
+                if (!loading && stores.isEmpty()) Text("No stores are available for your account.", color = MaterialTheme.colorScheme.error)
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
         }
     }
 }
@@ -225,25 +269,21 @@ private fun LoginScreen(repository: InventoryRepository, darkMode: Boolean, onTo
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun InventoryShell(user: UserDto, container: AppContainer, darkMode: Boolean, onToggleDarkMode: () -> Unit) {
+private fun InventoryShell(user: UserDto, store: StoreDto, container: AppContainer, darkMode: Boolean, onToggleDarkMode: () -> Unit) {
     var screen by remember { mutableStateOf(Screen.Home) }
+    var showingExitChoices by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
-                title = { Column { Text(screen.label); Text("${user.name} · ${user.role}", style = MaterialTheme.typography.labelSmall) } },
+                title = { Column { Text(screen.label); Text("${store.name} · ${user.name} · ${user.role}", style = MaterialTheme.typography.labelSmall) } },
                 actions = {
                     IconButton(onClick = onToggleDarkMode) {
                         Icon(if (darkMode) Icons.Default.LightMode else Icons.Default.DarkMode, if (darkMode) "Switch to light mode" else "Switch to dark mode")
                     }
-                    IconButton(onClick = {
-                        scope.launch {
-                            container.queueSync.clearUser(user.id)
-                            container.sessionStore.save(null)
-                        }
-                    }) { Icon(Icons.AutoMirrored.Filled.Logout, "Sign out") }
+                    IconButton(onClick = { showingExitChoices = true }) { Icon(Icons.AutoMirrored.Filled.Logout, "Switch store or sign out") }
                 },
             )
         },
@@ -263,30 +303,55 @@ private fun InventoryShell(user: UserDto, container: AppContainer, darkMode: Boo
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when (screen) {
-                Screen.Home -> HomeScreen(user, container.repository, snackbar)
-                Screen.Items -> ItemsScreen(user, container.repository, snackbar)
-                Screen.Find -> FindScreen(user, container.repository)
-                Screen.Counts -> CountsScreen(user, container.repository, container.queueSync, snackbar)
+                Screen.Home -> HomeScreen(user, store, container.repository, snackbar)
+                Screen.Items -> ItemsScreen(user, store, container.repository, snackbar)
+                Screen.Find -> FindScreen(user, store, container.repository)
+                Screen.Counts -> CountsScreen(user, store, container.repository, container.queueSync, snackbar)
                 Screen.More -> MoreScreen(user) { screen = it }
-                Screen.Labels -> LabelsScreen(user, container.repository, snackbar)
-                Screen.Variances -> VariancesScreen(user, container.repository, snackbar)
-                Screen.Reports -> ReportsScreen(user, container.repository, snackbar)
-                Screen.Audit -> AuditScreen(user, container.repository, snackbar)
+                Screen.Labels -> LabelsScreen(user, store.id, container.repository, snackbar)
+                Screen.Variances -> VariancesScreen(user, store.id, container.repository, snackbar)
+                Screen.Reports -> ReportsScreen(user, store.id, container.repository, snackbar)
+                Screen.Audit -> AuditScreen(user, store.id, container.repository, snackbar)
                 Screen.Admin -> AdminScreen(user, container.repository, snackbar)
             }
         }
     }
+    if (showingExitChoices) {
+        AlertDialog(
+            onDismissRequest = { showingExitChoices = false },
+            title = { Text("Leave ${store.name}?") },
+            text = { Text("Choose whether to work in a different store or sign out.") },
+            confirmButton = {
+                Button(onClick = {
+                    showingExitChoices = false
+                    scope.launch { container.sessionStore.saveStore(null) }
+                }) { Text("Switch store") }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { showingExitChoices = false }) { Text("Cancel") }
+                    TextButton(onClick = {
+                        showingExitChoices = false
+                        scope.launch {
+                            container.queueSync.clearUser(user.id)
+                            container.sessionStore.save(null)
+                        }
+                    }) { Text("Log out") }
+                }
+            },
+        )
+    }
 }
 
 @Composable
-private fun HomeScreen(user: UserDto, repository: InventoryRepository, snackbar: SnackbarHostState) {
+private fun HomeScreen(user: UserDto, store: StoreDto, repository: InventoryRepository, snackbar: SnackbarHostState) {
     var stores by remember { mutableStateOf<List<StoreDto>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var refresh by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
-    LaunchedEffect(user.id, refresh) {
+    LaunchedEffect(user.id, store.id, refresh) {
         loading = true
-        runCatching { repository.stores(user.id) }.onSuccess { stores = it }.onFailure { snackbar.showSnackbar(it.message ?: "Unable to load stores") }
+        runCatching { repository.stores(user.id) }.onSuccess { stores = it.filter { it.id == store.id } }.onFailure { snackbar.showSnackbar(it.message ?: "Unable to load store") }
         loading = false
     }
     ScreenList(loading = loading) {
@@ -312,10 +377,8 @@ private fun HomeScreen(user: UserDto, repository: InventoryRepository, snackbar:
 }
 
 @Composable
-private fun ItemsScreen(user: UserDto, repository: InventoryRepository, snackbar: SnackbarHostState) {
+private fun ItemsScreen(user: UserDto, store: StoreDto, repository: InventoryRepository, snackbar: SnackbarHostState) {
     val scope = rememberCoroutineScope()
-    var stores by remember { mutableStateOf<List<StoreDto>>(emptyList()) }
-    var storeId by remember { mutableStateOf("") }
     var query by remember { mutableStateOf("") }
     var rows by remember { mutableStateOf<List<ItemDto>>(emptyList()) }
     var selected by remember { mutableStateOf<ItemDto?>(null) }
@@ -324,15 +387,11 @@ private fun ItemsScreen(user: UserDto, repository: InventoryRepository, snackbar
     var scanning by remember { mutableStateOf(false) }
     var cursor by remember { mutableStateOf<String?>(null) }
     var isDone by remember { mutableStateOf(true) }
-    LaunchedEffect(user.id) {
-        runCatching { repository.stores(user.id) }.onSuccess { stores = it; if (storeId.isBlank()) storeId = it.firstOrNull()?.id.orEmpty() }
-    }
-    LaunchedEffect(storeId, query, refresh) {
-        if (storeId.isNotBlank()) runCatching { repository.items(user.id, storeId, query) }
+    LaunchedEffect(store.id, query, refresh) {
+        runCatching { repository.items(user.id, store.id, query) }
             .onSuccess { rows = it.page; cursor = it.continueCursor; isDone = it.isDone }.onFailure { snackbar.showSnackbar(it.message ?: "Unable to load items") }
     }
     Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        StorePicker(stores, storeId) { storeId = it }
         SearchBox(query, { query = it }, { scanning = true })
         if (user.canManage()) Button(onClick = { adding = true }) { Icon(Icons.Default.Add, null); Text(" Add item") }
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 16.dp)) {
@@ -340,7 +399,7 @@ private fun ItemsScreen(user: UserDto, repository: InventoryRepository, snackbar
         }
         if (!isDone) OutlinedButton(onClick = {
             scope.launch {
-                runCatching { repository.items(user.id, storeId, query, cursor) }.onSuccess { page ->
+                runCatching { repository.items(user.id, store.id, query, cursor) }.onSuccess { page ->
                     rows = rows + page.page
                     cursor = page.continueCursor
                     isDone = page.isDone
@@ -350,11 +409,11 @@ private fun ItemsScreen(user: UserDto, repository: InventoryRepository, snackbar
     }
     if (scanning) BarcodeScannerDialog(onResult = { query = it; scanning = false }, onDismiss = { scanning = false })
     selected?.let { item -> ItemDialog(user, item, repository, onDismiss = { selected = null }, onChanged = { selected = null; refresh++ }, snackbar = snackbar) }
-    if (adding && storeId.isNotBlank()) AddItemDialog(user, storeId, repository, { adding = false }, { adding = false; refresh++ }, snackbar)
+    if (adding) AddItemDialog(user, store.id, repository, { adding = false }, { adding = false; refresh++ }, snackbar)
 }
 
 @Composable
-private fun FindScreen(user: UserDto, repository: InventoryRepository) {
+private fun FindScreen(user: UserDto, store: StoreDto, repository: InventoryRepository) {
     var query by remember { mutableStateOf("") }
     var rows by remember { mutableStateOf<List<SearchGroupDto>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -370,12 +429,12 @@ private fun FindScreen(user: UserDto, repository: InventoryRepository) {
         SearchBox(query, { query = it }, { scanning = true })
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(rows) { group ->
+            items(rows.filter { group -> group.stores.any { it.storeId == store.id } }) { group ->
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
                         Text(group.name, fontWeight = FontWeight.Bold)
                         Text("${group.sku ?: group.code ?: "No SKU"} · ${money(group.priceCents)}")
-                        group.stores.forEach { Text("${it.storeName}: ${it.stockQuantity ?: "not tracked"}") }
+                        group.stores.filter { it.storeId == store.id }.forEach { Text("${it.storeName}: ${it.stockQuantity ?: "not tracked"}") }
                     }
                 }
             }
@@ -394,28 +453,24 @@ private fun FindScreen(user: UserDto, repository: InventoryRepository) {
 }
 
 @Composable
-private fun CountsScreen(user: UserDto, repository: InventoryRepository, queue: CountQueueSync, snackbar: SnackbarHostState) {
+private fun CountsScreen(user: UserDto, store: StoreDto, repository: InventoryRepository, queue: CountQueueSync, snackbar: SnackbarHostState) {
     val scope = rememberCoroutineScope()
     val queued by queue.queued.collectAsStateWithLifecycle(initialValue = emptyList())
-    var stores by remember { mutableStateOf<List<StoreDto>>(emptyList()) }
-    var storeId by remember { mutableStateOf("") }
     var query by remember { mutableStateOf("") }
     var rows by remember { mutableStateOf<List<ItemDto>>(emptyList()) }
     var selected by remember { mutableStateOf<ItemDto?>(null) }
     var scanning by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf<ProgressDto?>(null) }
-    LaunchedEffect(user.id) {
-        runCatching { repository.stores(user.id) }.onSuccess { stores = it; if (storeId.isBlank()) storeId = it.firstOrNull()?.id.orEmpty() }
+    LaunchedEffect(user.id, store.id) {
         queue.flush(repository)
     }
-    LaunchedEffect(storeId, query, queued.size) {
-        if (storeId.isNotBlank()) runCatching { repository.progress(user.id, storeId) }.onSuccess { progress = it }
-        if (storeId.isNotBlank() && query.trim().length >= 2) runCatching { repository.countSearch(user.id, storeId, query) }
+    LaunchedEffect(store.id, query, queued.size) {
+        runCatching { repository.progress(user.id, store.id) }.onSuccess { progress = it }
+        if (query.trim().length >= 2) runCatching { repository.countSearch(user.id, store.id, query) }
             .onSuccess { rows = it }.onFailure { snackbar.showSnackbar(it.message ?: "Search unavailable") }
         else rows = emptyList()
     }
     Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        StorePicker(stores, storeId) { storeId = it }
         progress?.let { Text("${it.counted} of ${it.total} counted · ${it.remaining} remaining · ${it.pendingVariances} pending variances") }
         SearchBox(query, { query = it }, { scanning = true })
         queued.filter { it.userId == user.id }.forEach { entry -> QueuedCountCard(entry, queue, repository, snackbar) }
@@ -430,7 +485,7 @@ private fun CountsScreen(user: UserDto, repository: InventoryRepository, queue: 
         CountDialog(item, onDismiss = { selected = null }) { quantity, note ->
             scope.launch {
                 runCatching {
-                    queue.enqueue(user, storeId, item, quantity, note, YearMonth.now().toString())
+                    queue.enqueue(user, store.id, item, quantity, note, YearMonth.now().toString())
                     queue.flush(repository)
                 }.onSuccess {
                     snackbar.showSnackbar("Count saved or queued for sync")
@@ -476,15 +531,6 @@ private fun MoreScreen(user: UserDto, onNavigate: (Screen) -> Unit) {
 private fun ScreenList(loading: Boolean = false, content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
     if (loading) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
     else LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 16.dp), content = content)
-}
-
-@Composable
-private fun StorePicker(stores: List<StoreDto>, selected: String, onSelect: (String) -> Unit) {
-    LazyColumn(Modifier.fillMaxWidth().height((stores.size.coerceAtMost(3) * 44 + 4).dp)) {
-        items(stores, key = { it.id }) { store ->
-            TextButton(onClick = { onSelect(store.id) }, modifier = Modifier.fillMaxWidth()) { Text(if (store.id == selected) "✓ ${store.name}" else store.name) }
-        }
-    }
 }
 
 @Composable

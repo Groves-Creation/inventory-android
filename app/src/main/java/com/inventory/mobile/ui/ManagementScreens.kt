@@ -173,19 +173,15 @@ fun AddItemDialog(
 }
 
 @Composable
-fun LabelsScreen(user: UserDto, repository: InventoryRepository, snackbar: SnackbarHostState) {
+fun LabelsScreen(user: UserDto, storeId: String, repository: InventoryRepository, snackbar: SnackbarHostState) {
     val context = LocalContext.current
-    var stores by remember { mutableStateOf<List<StoreDto>>(emptyList()) }
-    var storeId by remember { mutableStateOf("") }
     var query by remember { mutableStateOf("") }
     var rows by remember { mutableStateOf<List<ItemDto>>(emptyList()) }
     val copies = remember { mutableStateMapOf<String, Int>() }
-    LaunchedEffect(user.id) { runCatching { repository.stores(user.id) }.onSuccess { stores = it; storeId = it.firstOrNull()?.id.orEmpty() } }
     LaunchedEffect(storeId, query) {
         if (storeId.isNotBlank()) runCatching { repository.items(user.id, storeId, query) }.onSuccess { rows = it.page }.onFailure { snackbar.showSnackbar(it.message ?: "Unable to load labels") }
     }
     Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        CompactStorePicker(stores, storeId) { storeId = it }
         OutlinedTextField(query, { query = it }, label = { Text("Search labels") }, modifier = Modifier.fillMaxWidth())
         Button(
             enabled = copies.values.sum() > 0,
@@ -207,10 +203,8 @@ fun LabelsScreen(user: UserDto, repository: InventoryRepository, snackbar: Snack
 }
 
 @Composable
-fun VariancesScreen(user: UserDto, repository: InventoryRepository, snackbar: SnackbarHostState) {
+fun VariancesScreen(user: UserDto, storeId: String, repository: InventoryRepository, snackbar: SnackbarHostState) {
     val scope = rememberCoroutineScope()
-    var stores by remember { mutableStateOf<List<StoreDto>>(emptyList()) }
-    var storeId by remember { mutableStateOf("") }
     var rows by remember { mutableStateOf<List<VarianceDto>>(emptyList()) }
     var cloverRows by remember { mutableStateOf<List<CloverVarianceDto>>(emptyList()) }
     var showingCloverVariances by remember { mutableStateOf(false) }
@@ -241,10 +235,8 @@ fun VariancesScreen(user: UserDto, repository: InventoryRepository, snackbar: Sn
             }.onFailure { snackbar.showSnackbar(it.message ?: "Unable to push values to Clover") }
         }
     }
-    LaunchedEffect(user.id) { runCatching { repository.stores(user.id) }.onSuccess { stores = it; storeId = it.firstOrNull()?.id.orEmpty() } }
     LaunchedEffect(storeId, refresh) { if (storeId.isNotBlank()) runCatching { repository.variances(user.id, storeId) }.onSuccess { rows = it.page }.onFailure { snackbar.showSnackbar(it.message ?: "Unable to load variances") } }
     Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        CompactStorePicker(stores, storeId) { storeId = it }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { showingCloverVariances = false }) { Text(if (!showingCloverVariances) "✓ Count variances" else "Count variances") }
             OutlinedButton(onClick = { showingCloverVariances = true }) { Text(if (showingCloverVariances) "✓ Clover variances" else "Clover variances") }
@@ -321,17 +313,13 @@ private suspend fun resolveVariance(repository: InventoryRepository, user: UserD
 }
 
 @Composable
-fun ReportsScreen(user: UserDto, repository: InventoryRepository, snackbar: SnackbarHostState) {
+fun ReportsScreen(user: UserDto, storeId: String, repository: InventoryRepository, snackbar: SnackbarHostState) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var stores by remember { mutableStateOf<List<StoreDto>>(emptyList()) }
-    var storeId by remember { mutableStateOf("") }
     var month by remember { mutableStateOf(YearMonth.now().toString()) }
     var summary by remember { mutableStateOf<com.inventory.mobile.data.ReportSummaryDto?>(null) }
-    LaunchedEffect(user.id) { runCatching { repository.stores(user.id) }.onSuccess { stores = it; storeId = it.firstOrNull()?.id.orEmpty() } }
     LaunchedEffect(storeId, month) { if (storeId.isNotBlank()) runCatching { repository.report(user.id, storeId, month) }.onSuccess { summary = it }.onFailure { snackbar.showSnackbar(it.message ?: "Unable to load report") } }
     Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        CompactStorePicker(stores, storeId) { storeId = it }
         OutlinedTextField(month, { month = it.take(7) }, label = { Text("Month (YYYY-MM)") })
         summary?.summary?.let { stats ->
             Text("Counted ${stats.counted} · uncounted ${stats.uncounted}")
@@ -357,13 +345,13 @@ fun ReportsScreen(user: UserDto, repository: InventoryRepository, snackbar: Snac
 }
 
 @Composable
-fun AuditScreen(user: UserDto, repository: InventoryRepository, snackbar: SnackbarHostState) {
+fun AuditScreen(user: UserDto, storeId: String, repository: InventoryRepository, snackbar: SnackbarHostState) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var rows by remember { mutableStateOf<List<com.inventory.mobile.data.AuditDto>>(emptyList()) }
     var query by remember { mutableStateOf("") }
     var action by remember { mutableStateOf("") }
-    LaunchedEffect(query, action) { runCatching { repository.audit(user.id, action = action.takeIf(String::isNotBlank), query = query.takeIf(String::isNotBlank)) }.onSuccess { rows = it.page }.onFailure { snackbar.showSnackbar(it.message ?: "Unable to load audit") } }
+    LaunchedEffect(storeId, query, action) { runCatching { repository.audit(user.id, storeId = storeId, action = action.takeIf(String::isNotBlank), query = query.takeIf(String::isNotBlank)) }.onSuccess { rows = it.page }.onFailure { snackbar.showSnackbar(it.message ?: "Unable to load audit") } }
     Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(query, { query = it }, label = { Text("Search audit") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(action, { action = it }, label = { Text("Action filter") }, modifier = Modifier.fillMaxWidth())
@@ -373,7 +361,7 @@ fun AuditScreen(user: UserDto, repository: InventoryRepository, snackbar: Snackb
                     val exported = mutableListOf<com.inventory.mobile.data.AuditDto>()
                     var cursor: String? = null
                     do {
-                        val page = repository.audit(user.id, action = action.takeIf(String::isNotBlank), query = query.takeIf(String::isNotBlank), cursor = cursor)
+                        val page = repository.audit(user.id, storeId = storeId, action = action.takeIf(String::isNotBlank), query = query.takeIf(String::isNotBlank), cursor = cursor)
                         exported += page.page
                         cursor = if (page.isDone) null else page.continueCursor
                     } while (cursor != null)
@@ -504,13 +492,6 @@ private fun AddUserDialog(owner: UserDto, stores: List<StoreDto>, repository: In
         confirmButton = { Button(enabled = name.isNotBlank() && pin.length >= 4, onClick = { scope.launch { runCatching { repository.saveUser(mapOf("actorId" to owner.id, "name" to name, "pin" to pin, "role" to role, "storeIds" to selectedStores.toList())) }.onSuccess { onCreated() }.onFailure { snackbar.showSnackbar(it.message ?: "Unable to create user") } } }) { Text("Create") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
-}
-
-@Composable
-private fun CompactStorePicker(stores: List<StoreDto>, selected: String, onSelect: (String) -> Unit) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        stores.take(4).forEach { store -> OutlinedButton(onClick = { onSelect(store.id) }) { Text(if (selected == store.id) "✓ ${store.name}" else store.name) } }
-    }
 }
 
 private fun mobileRequestId() = "android_${UUID.randomUUID().toString().replace("-", "_")}"
