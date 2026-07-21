@@ -15,7 +15,7 @@ interface InventoryRepository {
     suspend fun progress(userId: String, storeId: String): ProgressDto
     suspend fun recordCount(args: CountSubmission): CountResultDto
     suspend fun generateBarcode(userId: String): String
-    suspend fun syncStore(userId: String, storeId: String): ActionResultDto
+    suspend fun syncStore(userId: String, storeId: String): SyncResultDto
     suspend fun createItem(args: Map<String, Any?>): ActionResultDto
     suspend fun changeItem(args: Map<String, Any?>): ActionResultDto
     suspend fun variances(userId: String, storeId: String, cursor: String? = null): PageDto<VarianceDto>
@@ -78,7 +78,7 @@ class ConvexInventoryRepository(private val client: ConvexClient) : InventoryRep
         ),
     )
     override suspend fun generateBarcode(userId: String) = client.mutation<String>("inventory:generateBarcode", mapOf("userId" to userId))
-    override suspend fun syncStore(userId: String, storeId: String) = client.action<ActionResultDto>("cloverActions:syncStore", mapOf("userId" to userId, "storeId" to storeId))
+    override suspend fun syncStore(userId: String, storeId: String) = client.action<SyncResultDto>("cloverActions:syncStore", mapOf("userId" to userId, "storeId" to storeId))
     override suspend fun createItem(args: Map<String, Any?>) = client.action<ActionResultDto>("cloverActions:createCloverItem", args)
     override suspend fun changeItem(args: Map<String, Any?>) = client.action<ActionResultDto>("cloverActions:changeCloverItem", args)
     override suspend fun variances(userId: String, storeId: String, cursor: String?) = query<PageDto<VarianceDto>>(

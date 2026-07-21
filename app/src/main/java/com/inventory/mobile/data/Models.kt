@@ -112,6 +112,13 @@ data class VarianceDto(
 data class ActionResultDto(val status: String, val message: String? = null)
 
 @Serializable
+data class SyncResultDto(
+    val upserted: Double,
+    val tombstoned: Double,
+    val skipped: Boolean = false,
+)
+
+@Serializable
 data class ReportSummaryDto(val summary: ReportStatsDto)
 
 @Serializable

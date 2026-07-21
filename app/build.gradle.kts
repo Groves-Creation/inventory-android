@@ -23,8 +23,8 @@ android {
         applicationId = "com.inventory.mobile"
         minSdk = 31
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.1.3-pilot"
+        versionCode = 5
+        versionName = "0.1.4-pilot"
         buildConfigField("String", "CONVEX_URL", "\"${convexUrl.replace("\"", "\\\"")}\"")
         buildConfigField("String", "UPDATE_REPOSITORY", "\"mtdewwolf/inventory-android\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
