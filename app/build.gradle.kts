@@ -14,6 +14,28 @@ val releaseKeystorePath = providers.environmentVariable("ANDROID_KEYSTORE_PATH")
 val releaseKeystorePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD")
 val releaseKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS")
 val releaseKeyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD")
+val releaseChannel = "brutalist"
+val baselineBranch = "Master"
+val baselineVersion = "0.3.0"
+val baselineCommit = "af505ea"
+val buildRevision = providers.gradleProperty("INVENTORY_BUILD_REVISION")
+    .orElse(providers.environmentVariable("GITHUB_SHA"))
+    .orElse(
+        providers.provider {
+            runCatching {
+                ProcessBuilder("git", "rev-parse", "--short=12", "HEAD")
+                    .directory(rootDir)
+                    .start()
+                    .inputStream
+                    .bufferedReader()
+                    .use { it.readText().trim() }
+            }.getOrDefault("unknown")
+        },
+    )
+
+val appVersionCode = 11
+val appVersionName = "v0.3.1-0721260230-brut"
+val expectedReleaseTag = appVersionName
 
 android {
     namespace = "com.inventory.mobile"
@@ -23,10 +45,15 @@ android {
         applicationId = "com.inventory.mobile"
         minSdk = 31
         targetSdk = 36
-        versionCode = 9
-        versionName = "0.3.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
         buildConfigField("String", "CONVEX_URL", "\"${convexUrl.replace("\"", "\\\"")}\"")
         buildConfigField("String", "UPDATE_REPOSITORY", "\"mtdewwolf/inventory-android\"")
+        buildConfigField("String", "UPDATE_CHANNEL", "\"$releaseChannel\"")
+        buildConfigField("String", "BASELINE_BRANCH", "\"$baselineBranch\"")
+        buildConfigField("String", "BASELINE_VERSION", "\"$baselineVersion\"")
+        buildConfigField("String", "BASELINE_COMMIT", "\"$baselineCommit\"")
+        buildConfigField("String", "BUILD_REVISION", "\"${buildRevision.get().take(12)}\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -57,6 +84,20 @@ android {
     }
 
     packaging.resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+}
+
+tasks.register("verifyReleaseTag") {
+    val releaseTag = providers.environmentVariable("GITHUB_REF_NAME").orNull
+    onlyIf { !releaseTag.isNullOrBlank() }
+    doLast {
+        check(releaseTag == expectedReleaseTag) {
+            "Release tag '$releaseTag' does not match app version '$appVersionName'. Use '$expectedReleaseTag'."
+        }
+    }
+}
+
+tasks.matching { it.name == "assembleRelease" }.configureEach {
+    dependsOn("verifyReleaseTag")
 }
 
 room {

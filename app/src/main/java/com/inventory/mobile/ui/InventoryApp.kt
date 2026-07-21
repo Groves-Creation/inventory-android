@@ -171,6 +171,7 @@ fun InventoryApp(container: AppContainer, onInstallUpdate: (AvailableUpdate) -> 
                 GitHubReleaseChecker.findAvailableUpdate(
                     repository = BuildConfig.UPDATE_REPOSITORY,
                     currentVersion = BuildConfig.VERSION_NAME,
+                    updateChannel = BuildConfig.UPDATE_CHANNEL,
                 )
             }.onSuccess { update ->
                 availableUpdate = update
@@ -631,7 +632,14 @@ private fun MoreScreen(user: UserDto, onNavigate: (Screen) -> Unit) {
 private fun SettingsScreen(checkingForUpdate: Boolean, updateCheckMessage: String?, onCheckForUpdates: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Settings", style = MaterialTheme.typography.headlineSmall)
-        Text("Version ${BuildConfig.VERSION_NAME}")
+        BrutalCard(Modifier.fillMaxWidth()) {
+            Text("BUILD INFORMATION", style = MaterialTheme.typography.titleMedium)
+            Text("Version ${BuildConfig.VERSION_NAME}")
+            Text("Update channel: ${BuildConfig.UPDATE_CHANNEL.replaceFirstChar { it.uppercase() }}")
+            Text("Based on ${BuildConfig.BASELINE_BRANCH} ${BuildConfig.BASELINE_VERSION}")
+            Text("Baseline commit: ${BuildConfig.BASELINE_COMMIT}")
+            Text("Build revision: ${BuildConfig.BUILD_REVISION}")
+        }
         Button(enabled = !checkingForUpdate, onClick = onCheckForUpdates) {
             Text(if (checkingForUpdate) "Checking for updates…" else "Check for updates")
         }
