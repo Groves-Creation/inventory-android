@@ -6,7 +6,10 @@ plugins {
     id("androidx.room")
 }
 
-val convexUrl = providers.gradleProperty("INVENTORY_CONVEX_URL").orNull.orEmpty()
+val convexUrl = providers.gradleProperty("INVENTORY_CONVEX_URL")
+    .orElse(providers.environmentVariable("INVENTORY_CONVEX_URL"))
+    .orNull
+    .orEmpty()
 val releaseKeystorePath = providers.environmentVariable("ANDROID_KEYSTORE_PATH")
 val releaseKeystorePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD")
 val releaseKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS")
@@ -20,8 +23,8 @@ android {
         applicationId = "com.inventory.mobile"
         minSdk = 31
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.1.2-pilot"
+        versionCode = 4
+        versionName = "0.1.3-pilot"
         buildConfigField("String", "CONVEX_URL", "\"${convexUrl.replace("\"", "\\\"")}\"")
         buildConfigField("String", "UPDATE_REPOSITORY", "\"mtdewwolf/inventory-android\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
