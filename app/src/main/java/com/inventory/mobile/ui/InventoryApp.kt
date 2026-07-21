@@ -3,6 +3,7 @@ package com.inventory.mobile.ui
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -59,13 +61,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.inventory.mobile.AppContainer
 import com.inventory.mobile.BuildConfig
+import com.inventory.mobile.R
 import com.inventory.mobile.data.CountQueueSync
 import com.inventory.mobile.data.InventoryRepository
 import com.inventory.mobile.data.ItemDto
@@ -220,11 +225,26 @@ private fun StoreSelectionScreen(
         loading = false
     }
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+        if (!darkMode) {
+            Image(
+                painter = painterResource(R.drawable.inventory_background),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                alpha = 0.72f,
+            )
+        }
         IconButton(onClick = onToggleDarkMode, modifier = Modifier.align(Alignment.TopEnd)) {
             Icon(if (darkMode) Icons.Default.LightMode else Icons.Default.DarkMode, if (darkMode) "Switch to light mode" else "Switch to dark mode")
         }
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Image(
+                    painter = painterResource(R.drawable.inventory_welcome),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxWidth().height(132.dp),
+                )
                 Text("Choose a store", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Text("You will stay in this store until you switch stores or log out.")
                 if (loading) CircularProgressIndicator()
@@ -252,6 +272,15 @@ private fun LoginScreen(repository: InventoryRepository, darkMode: Boolean, onTo
         runCatching { repository.loginUsers() }.onSuccess { users = it }.onFailure { error = it.message }
     }
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+        if (!darkMode) {
+            Image(
+                painter = painterResource(R.drawable.inventory_background),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                alpha = 0.72f,
+            )
+        }
         IconButton(onClick = onToggleDarkMode, modifier = Modifier.align(Alignment.TopEnd)) {
             Icon(if (darkMode) Icons.Default.LightMode else Icons.Default.DarkMode, if (darkMode) "Switch to light mode" else "Switch to dark mode")
         }
