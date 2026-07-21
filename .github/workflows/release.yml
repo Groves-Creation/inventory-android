@@ -53,8 +53,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          prerelease_flag=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            prerelease_flag=(--prerelease)
+          fi
           gh release create "$GITHUB_REF_NAME" \
             app/build/outputs/apk/release/app-release.apk \
             app/build/outputs/mapping/release/mapping.txt \
             --title "$GITHUB_REF_NAME" \
-            --generate-notes
+            --generate-notes \
+            "${prerelease_flag[@]}"
