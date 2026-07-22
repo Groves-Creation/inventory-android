@@ -63,6 +63,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalView
@@ -706,6 +707,7 @@ private fun ItemCard(item: ItemDto, onClick: () -> Unit) {
     OutlinedButton(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
+        shape = RectangleShape,
         border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
         contentPadding = PaddingValues(14.dp),
     ) {
