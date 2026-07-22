@@ -21,16 +21,15 @@ class GitHubReleaseCheckerTest {
     }
 
     @Test
-    fun `brutalist channel accepts only brutalist releases`() {
-        assertTrue(GitHubReleaseChecker.isNewerInChannel("v0.3.1-0721260230-brut", "v0.3.0-0720260230-brut", "brutalist"))
-        assertTrue(GitHubReleaseChecker.isNewerInChannel("v0.3.1-0721260231-brut", "v0.3.1-0721260230-brut", "brutalist"))
-        assertFalse(GitHubReleaseChecker.isNewerInChannel("v0.4.0", "0.3.0-brutalist", "brutalist"))
+    fun `stable channel accepts only stable Master releases`() {
+        assertTrue(GitHubReleaseChecker.belongsToChannel("v0.3.1", isPrerelease = false, channel = UpdateChannel.Stable))
+        assertFalse(GitHubReleaseChecker.belongsToChannel("v0.3.2-0721261939-brut", isPrerelease = true, channel = UpdateChannel.Stable))
     }
 
     @Test
-    fun `stable channel ignores prereleases and brutalist releases`() {
-        assertTrue(GitHubReleaseChecker.isNewerInChannel("v0.3.1", "0.3.0", "stable"))
-        assertFalse(GitHubReleaseChecker.isNewerInChannel("v0.4.0-pilot", "0.3.0", "stable"))
-        assertFalse(GitHubReleaseChecker.isNewerInChannel("v0.4.0-0721260230-brut", "0.3.0", "stable"))
+    fun `beta brut channel accepts only Brutalist prereleases`() {
+        assertTrue(GitHubReleaseChecker.belongsToChannel("v0.3.2-0721261939-brut", isPrerelease = true, channel = UpdateChannel.BetaBrut))
+        assertFalse(GitHubReleaseChecker.belongsToChannel("v0.3.1", isPrerelease = false, channel = UpdateChannel.BetaBrut))
+        assertFalse(GitHubReleaseChecker.belongsToChannel("v0.3.1-pilot", isPrerelease = true, channel = UpdateChannel.BetaBrut))
     }
 }

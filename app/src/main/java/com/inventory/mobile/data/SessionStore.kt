@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import com.inventory.mobile.update.UpdateChannel
 
 private val Context.sessionDataStore by preferencesDataStore("inventory_session")
 
@@ -17,6 +18,7 @@ class SessionStore(private val context: Context) {
     private val userKey = stringPreferencesKey("user")
     private val storeKey = stringPreferencesKey("store")
     private val darkModeKey = booleanPreferencesKey("dark_mode")
+    private val updateChannelKey = stringPreferencesKey("update_channel")
 
     val user: Flow<UserDto?> = context.sessionDataStore.data.map { preferences ->
         preferences[userKey]?.let { runCatching { json.decodeFromString<UserDto>(it) }.getOrNull() }
@@ -28,6 +30,10 @@ class SessionStore(private val context: Context) {
 
     val darkMode: Flow<Boolean?> = context.sessionDataStore.data.map { preferences ->
         preferences[darkModeKey]
+    }
+
+    val updateChannel: Flow<UpdateChannel> = context.sessionDataStore.data.map { preferences ->
+        UpdateChannel.fromId(preferences[updateChannelKey])
     }
 
     suspend fun save(user: UserDto?) {
@@ -49,5 +55,9 @@ class SessionStore(private val context: Context) {
 
     suspend fun saveDarkMode(enabled: Boolean) {
         context.sessionDataStore.edit { preferences -> preferences[darkModeKey] = enabled }
+    }
+
+    suspend fun saveUpdateChannel(channel: UpdateChannel) {
+        context.sessionDataStore.edit { preferences -> preferences[updateChannelKey] = channel.id }
     }
 }

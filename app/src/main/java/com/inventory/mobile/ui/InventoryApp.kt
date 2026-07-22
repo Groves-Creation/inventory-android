@@ -87,6 +87,7 @@ import com.inventory.mobile.data.StoreDto
 import com.inventory.mobile.data.UserDto
 import com.inventory.mobile.update.AvailableUpdate
 import com.inventory.mobile.update.GitHubReleaseChecker
+import com.inventory.mobile.update.UpdateChannel
 import kotlinx.coroutines.launch
 import java.time.YearMonth
 import java.util.UUID
@@ -156,6 +157,7 @@ fun InventoryApp(container: AppContainer, onInstallUpdate: (AvailableUpdate) -> 
     val user by container.sessionStore.user.collectAsStateWithLifecycle(initialValue = null)
     val selectedStore by container.sessionStore.store.collectAsStateWithLifecycle(initialValue = null)
     val savedDarkMode by container.sessionStore.darkMode.collectAsStateWithLifecycle(initialValue = null)
+    val updateChannel by container.sessionStore.updateChannel.collectAsStateWithLifecycle(initialValue = UpdateChannel.Stable)
     val darkMode = savedDarkMode ?: isSystemInDarkTheme()
     val scope = rememberCoroutineScope()
     val view = LocalView.current
@@ -171,7 +173,7 @@ fun InventoryApp(container: AppContainer, onInstallUpdate: (AvailableUpdate) -> 
                 GitHubReleaseChecker.findAvailableUpdate(
                     repository = BuildConfig.UPDATE_REPOSITORY,
                     currentVersion = BuildConfig.VERSION_NAME,
-                    updateChannel = BuildConfig.UPDATE_CHANNEL,
+                    updateChannel = updateChannel,
                 )
             }.onSuccess { update ->
                 availableUpdate = update
@@ -182,7 +184,7 @@ fun InventoryApp(container: AppContainer, onInstallUpdate: (AvailableUpdate) -> 
             checkingForUpdate = false
         }
     }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(updateChannel) {
         checkForUpdates(showResult = false)
     }
     SideEffect {
@@ -227,7 +229,13 @@ fun InventoryApp(container: AppContainer, onInstallUpdate: (AvailableUpdate) -> 
                 toggleDarkMode,
                 checkingForUpdate,
                 updateCheckMessage,
+                updateChannel,
                 onCheckForUpdates = { checkForUpdates(showResult = true) },
+                onUpdateChannelChange = { channel ->
+                    availableUpdate = null
+                    updateCheckMessage = null
+                    scope.launch { container.sessionStore.saveUpdateChannel(channel) }
+                },
             )
         }
         availableUpdate?.let { update ->
@@ -353,7 +361,9 @@ private fun InventoryShell(
     onToggleDarkMode: () -> Unit,
     checkingForUpdate: Boolean,
     updateCheckMessage: String?,
+    updateChannel: UpdateChannel,
     onCheckForUpdates: () -> Unit,
+    onUpdateChannelChange: (UpdateChannel) -> Unit,
 ) {
     var screen by remember { mutableStateOf(Screen.Home) }
     var showingExitChoices by remember { mutableStateOf(false) }
@@ -406,7 +416,13 @@ private fun InventoryShell(
                 Screen.Find -> FindScreen(user, store, container.repository)
                 Screen.Counts -> CountsScreen(user, store, container.repository, container.queueSync, snackbar)
                 Screen.More -> MoreScreen(user) { screen = it }
-                Screen.Settings -> SettingsScreen(checkingForUpdate, updateCheckMessage, onCheckForUpdates)
+                Screen.Settings -> SettingsScreen(
+                    checkingForUpdate,
+                    updateCheckMessage,
+                    updateChannel,
+                    onCheckForUpdates,
+                    onUpdateChannelChange,
+                )
                 Screen.Labels -> LabelsScreen(user, store.id, container.repository, snackbar)
                 Screen.Variances -> VariancesScreen(user, store.id, container.repository, snackbar)
                 Screen.Reports -> ReportsScreen(user, store.id, container.repository, snackbar)
@@ -629,16 +645,36 @@ private fun MoreScreen(user: UserDto, onNavigate: (Screen) -> Unit) {
 }
 
 @Composable
-private fun SettingsScreen(checkingForUpdate: Boolean, updateCheckMessage: String?, onCheckForUpdates: () -> Unit) {
+private fun SettingsScreen(
+    checkingForUpdate: Boolean,
+    updateCheckMessage: String?,
+    updateChannel: UpdateChannel,
+    onCheckForUpdates: () -> Unit,
+    onUpdateChannelChange: (UpdateChannel) -> Unit,
+) {
     Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Settings", style = MaterialTheme.typography.headlineSmall)
+        Text("SETTINGS", style = MaterialTheme.typography.headlineSmall)
         BrutalCard(Modifier.fillMaxWidth()) {
             Text("BUILD INFORMATION", style = MaterialTheme.typography.titleMedium)
             Text("Version ${BuildConfig.VERSION_NAME}")
-            Text("Update channel: ${BuildConfig.UPDATE_CHANNEL.replaceFirstChar { it.uppercase() }}")
             Text("Based on ${BuildConfig.BASELINE_BRANCH} ${BuildConfig.BASELINE_VERSION}")
             Text("Baseline commit: ${BuildConfig.BASELINE_COMMIT}")
             Text("Build revision: ${BuildConfig.BUILD_REVISION}")
+        }
+        Text("UPDATE CHANNEL", style = MaterialTheme.typography.titleMedium)
+        UpdateChannel.entries.forEach { channel ->
+            OutlinedButton(
+                onClick = { onUpdateChannelChange(channel) },
+                enabled = channel != updateChannel,
+                modifier = Modifier.fillMaxWidth(),
+                border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+            ) {
+                Column(Modifier.fillMaxWidth()) {
+                    Text(channel.label.uppercase(), fontWeight = FontWeight.Bold)
+                    Text(channel.description, style = MaterialTheme.typography.bodySmall)
+                    if (channel == updateChannel) Text("ACTIVE", color = MaterialTheme.colorScheme.tertiary)
+                }
+            }
         }
         Button(enabled = !checkingForUpdate, onClick = onCheckForUpdates) {
             Text(if (checkingForUpdate) "Checking for updates…" else "Check for updates")

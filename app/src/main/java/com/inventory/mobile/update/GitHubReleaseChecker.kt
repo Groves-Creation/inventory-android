@@ -15,12 +15,41 @@ data class AvailableUpdate(
     val downloadUrl: String,
 )
 
+enum class UpdateChannel(
+    val id: String,
+    val label: String,
+    val description: String,
+) {
+    Stable(
+        id = "stable",
+        label = "Master stable",
+        description = "Receive production releases from Master only.",
+    ),
+    BetaBrut(
+        id = "beta-brut",
+        label = "Beta Brut",
+        description = "Receive Brutalist beta prereleases before they are promoted to Master.",
+    );
+
+    internal fun accepts(isPrerelease: Boolean, isDraft: Boolean, qualifier: String?): Boolean = when (this) {
+        Stable -> !isPrerelease && !isDraft && qualifier == null
+        BetaBrut -> isPrerelease && !isDraft && qualifier?.endsWith("-brut") == true
+    }
+
+    companion object {
+        fun fromId(id: String?): UpdateChannel = entries.firstOrNull { it.id == id } ?: Stable
+    }
+}
+
 object GitHubReleaseChecker {
     private val json = Json { ignoreUnknownKeys = true }
 
-    suspend fun findAvailableUpdate(repository: String, currentVersion: String, updateChannel: String): AvailableUpdate? = withContext(Dispatchers.IO) {
+    suspend fun findAvailableUpdate(
+        repository: String,
+        currentVersion: String,
+        updateChannel: UpdateChannel = UpdateChannel.Stable,
+    ): AvailableUpdate? = withContext(Dispatchers.IO) {
         val installedVersion = ReleaseVersion.parse(currentVersion) ?: return@withContext null
-        val channel = ReleaseChannel.fromId(updateChannel) ?: return@withContext null
         val connection = (URL("https://api.github.com/repos/$repository/releases?per_page=20").openConnection() as HttpURLConnection)
         try {
             connection.requestMethod = "GET"
@@ -38,10 +67,11 @@ object GitHubReleaseChecker {
             }
             releases
                 .mapNotNull { release ->
-                    val version = channel.versionFromTag(release.tagName) ?: return@mapNotNull null
+                    val version = ReleaseVersion.parse(release.tagName) ?: return@mapNotNull null
+                    if (!updateChannel.accepts(release.isPrerelease, release.isDraft, version.qualifier)) return@mapNotNull null
                     val asset = release.assets.firstOrNull { it.name.startsWith("Inventory-") && it.name.endsWith(".apk", ignoreCase = true) }
                         ?: return@mapNotNull null
-                    ReleaseCandidate(version, AvailableUpdate(release.tagName, asset.downloadUrl))
+                    ReleaseCandidate(version, AvailableUpdate(version.toString(), asset.downloadUrl))
                 }
                 .filter { it.version > installedVersion }
                 .maxByOrNull { it.version }
@@ -57,16 +87,20 @@ object GitHubReleaseChecker {
         return candidateVersion > currentVersion
     }
 
-    internal fun isNewerInChannel(candidateTag: String, currentVersion: String, updateChannel: String): Boolean {
-        val channel = ReleaseChannel.fromId(updateChannel) ?: return false
-        val candidateVersion = channel.versionFromTag(candidateTag) ?: return false
-        val current = ReleaseVersion.parse(currentVersion) ?: return false
-        return candidateVersion > current
+    internal fun belongsToChannel(
+        tag: String,
+        isPrerelease: Boolean,
+        channel: UpdateChannel,
+    ): Boolean {
+        val version = ReleaseVersion.parse(tag) ?: return false
+        return channel.accepts(isPrerelease, isDraft = false, qualifier = version.qualifier)
     }
 
     @Serializable
     private data class GitHubRelease(
         @SerialName("tag_name") val tagName: String,
+        @SerialName("prerelease") val isPrerelease: Boolean = false,
+        @SerialName("draft") val isDraft: Boolean = false,
         val assets: List<GitHubAsset>,
     )
 
@@ -80,27 +114,6 @@ object GitHubReleaseChecker {
         val version: ReleaseVersion,
         val update: AvailableUpdate,
     )
-}
-
-private enum class ReleaseChannel(
-    val id: String,
-    private val qualifierPattern: Regex?,
-) {
-    Stable(id = "stable", qualifierPattern = null),
-    Brutalist(id = "brutalist", qualifierPattern = Regex("\\d{10}-brut"));
-
-    fun versionFromTag(tag: String): ReleaseVersion? {
-        val version = ReleaseVersion.parse(tag) ?: return null
-        return when {
-            qualifierPattern == null && version.qualifier == null -> version
-            qualifierPattern != null && version.qualifier?.matches(qualifierPattern) == true -> version
-            else -> null
-        }
-    }
-
-    companion object {
-        fun fromId(id: String): ReleaseChannel? = entries.firstOrNull { it.id == id }
-    }
 }
 
 private data class ReleaseVersion(
