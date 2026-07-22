@@ -33,8 +33,8 @@ val buildRevision = providers.gradleProperty("INVENTORY_BUILD_REVISION")
         },
     )
 
-val appVersionCode = 13
-val appVersionName = "v0.3.3-0721262004-brut"
+val appVersionCode = 14
+val appVersionName = "v0.3.4-0721262020-brut"
 val expectedReleaseTag = appVersionName
 
 android {

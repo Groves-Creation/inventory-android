@@ -10,7 +10,7 @@ interface InventoryRepository {
     suspend fun login(name: String, pin: String): UserDto
     suspend fun stores(userId: String): List<StoreDto>
     suspend fun items(userId: String, storeId: String, query: String, cursor: String? = null): PageDto<ItemDto>
-    suspend fun find(userId: String, query: String, cursor: String? = null): PageDto<SearchGroupDto>
+    suspend fun find(userId: String, storeId: String, query: String, cursor: String? = null): PageDto<SearchGroupDto>
     suspend fun countSearch(userId: String, storeId: String, query: String): List<ItemDto>
     suspend fun progress(userId: String, storeId: String): ProgressDto
     suspend fun recordCount(args: CountSubmission): CountResultDto
@@ -55,9 +55,9 @@ class ConvexInventoryRepository(private val client: ConvexClient) : InventoryRep
         "inventory:listItems",
         mapOf("userId" to userId, "storeId" to storeId, "q" to query, "paginationOpts" to paginationArgs(50, cursor)),
     )
-    override suspend fun find(userId: String, query: String, cursor: String?) = query<PageDto<SearchGroupDto>>(
+    override suspend fun find(userId: String, storeId: String, query: String, cursor: String?) = query<PageDto<SearchGroupDto>>(
         "inventory:searchAllItems",
-        mapOf("userId" to userId, "q" to query, "paginationOpts" to paginationArgs(50, cursor)),
+        mapOf("userId" to userId, "storeId" to storeId, "q" to query, "paginationOpts" to paginationArgs(50, cursor)),
     )
     override suspend fun countSearch(userId: String, storeId: String, query: String) = query<List<ItemDto>>(
         "inventory:searchForCounting", mapOf("userId" to userId, "storeId" to storeId, "q" to query),
