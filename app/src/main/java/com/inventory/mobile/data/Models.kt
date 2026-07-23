@@ -176,3 +176,39 @@ data class CloverVarianceDto(
 
 @Serializable
 data class CloverVarianceResultDto(val rows: List<CloverVarianceDto>, val limited: Boolean = false)
+
+@Serializable
+data class MessageDto(
+    val id: String,
+    val messageId: String,
+    val kind: String,
+    val senderId: String,
+    val senderName: String,
+    val subject: String? = null,
+    val body: String,
+    val storeName: String? = null,
+    val recipientCount: Double = 1.0,
+    val createdAt: String,
+    val readAt: String? = null,
+    val read: Boolean = false,
+) {
+    val isBroadcast get() = kind == "broadcast"
+}
+
+@Serializable
+data class UnreadCountDto(val count: Double, val hasMore: Boolean = false)
+
+@Serializable
+data class ContactDto(val id: String, val name: String, val role: String)
+
+@Serializable
+data class MessageSendResultDto(val messageId: String, val recipientCount: Double)
+
+@Serializable
+data class MarkAllReadResultDto(val marked: Double, val hasMore: Boolean = false)
+
+@Serializable
+data class MessageReadResultDto(val read: Boolean)
+
+@Serializable
+data class MessageRemovedResultDto(val removed: Boolean)

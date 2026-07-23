@@ -25,9 +25,12 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -87,7 +90,7 @@ import java.time.YearMonth
 import java.util.UUID
 
 private enum class Screen(val label: String) {
-    Home("Home"), Items("Items"), Find("Find"), Counts("Count"), More("More"), Settings("Settings"), Labels("Labels"), Variances("Variances"), Reports("Reports"), Audit("Audit"), Admin("Admin")
+    Home("Home"), Items("Items"), Find("Find"), Counts("Count"), More("More"), Settings("Settings"), Labels("Labels"), Variances("Variances"), Reports("Reports"), Audit("Audit"), Admin("Admin"), Inbox("Inbox")
 }
 
 private enum class AppBackground(val light: Int, val dark: Int) {
@@ -110,7 +113,7 @@ private fun Screen.background() = when (this) {
     Screen.Items -> AppBackground.Items
     Screen.Find -> AppBackground.Find
     Screen.Counts -> AppBackground.Count
-    Screen.More -> AppBackground.More
+    Screen.More, Screen.Inbox -> AppBackground.More
     Screen.Settings, Screen.Admin -> AppBackground.Settings
     Screen.Labels -> AppBackground.Labels
     Screen.Variances -> AppBackground.Variances
@@ -368,8 +371,16 @@ private fun InventoryShell(
 ) {
     var screen by remember { mutableStateOf(Screen.Home) }
     var showingExitChoices by remember { mutableStateOf(false) }
+    var unread by remember { mutableStateOf(0) }
+    var unreadCapped by remember { mutableStateOf(false) }
+    var unreadRefresh by remember { mutableIntStateOf(0) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    // The badge is refreshed when the user changes screens and after any inbox action.
+    LaunchedEffect(user.id, screen, unreadRefresh) {
+        runCatching { container.repository.unreadCount(user.id) }
+            .onSuccess { unread = it.count.toInt(); unreadCapped = it.hasMore }
+    }
     Box(Modifier.fillMaxSize()) {
         ScreenBackground(screen.background(), darkMode)
         Scaffold(
@@ -379,6 +390,11 @@ private fun InventoryShell(
             TopAppBar(
                 title = { Column { Text(screen.label); Text("${store.name} · ${user.name} · ${user.role}", style = MaterialTheme.typography.labelSmall) } },
                 actions = {
+                    IconButton(onClick = { screen = Screen.Inbox }) {
+                        BadgedBox(badge = { if (unread > 0) Badge { Text(if (unreadCapped) "${unread}+" else "$unread") } }) {
+                            Icon(Icons.Default.Mail, if (unread > 0) "Inbox, $unread unread" else "Inbox")
+                        }
+                    }
                     IconButton(onClick = onToggleDarkMode) {
                         Icon(if (darkMode) Icons.Default.LightMode else Icons.Default.DarkMode, if (darkMode) "Switch to light mode" else "Switch to dark mode")
                     }
@@ -407,6 +423,7 @@ private fun InventoryShell(
                 Screen.Find -> FindScreen(user, store, container.repository)
                 Screen.Counts -> CountsScreen(user, store, container.repository, container.queueSync, snackbar)
                 Screen.More -> MoreScreen(user) { screen = it }
+                Screen.Inbox -> InboxScreen(user, store, container.repository, snackbar) { unreadRefresh++ }
                 Screen.Settings -> SettingsScreen(checkingForUpdate, updateCheckMessage, updateChannel, onCheckForUpdates, onUpdateChannelChange)
                 Screen.Labels -> LabelsScreen(user, store.id, container.repository, snackbar)
                 Screen.Variances -> VariancesScreen(user, store.id, container.repository, snackbar)
@@ -617,6 +634,7 @@ private fun QueuedCountCard(entry: QueuedCount, queue: CountQueueSync, repositor
 @Composable
 private fun MoreScreen(user: UserDto, onNavigate: (Screen) -> Unit) {
     val choices = buildList {
+        add(Screen.Inbox)
         add(Screen.Settings)
         add(Screen.Labels)
         if (user.canManage()) addAll(listOf(Screen.Variances, Screen.Reports, Screen.Audit))

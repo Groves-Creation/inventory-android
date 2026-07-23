@@ -28,6 +28,15 @@ interface InventoryRepository {
     suspend fun saveUser(args: Map<String, Any?>)
     suspend fun syncRuns(userId: String): List<SyncRunDto>
     suspend fun operationHealth(userId: String): List<OperationHealthDto>
+    suspend fun inbox(userId: String, unreadOnly: Boolean = false, cursor: String? = null): PageDto<MessageDto>
+    suspend fun sentMessages(userId: String, cursor: String? = null): PageDto<MessageDto>
+    suspend fun unreadCount(userId: String): UnreadCountDto
+    suspend fun contacts(userId: String): List<ContactDto>
+    suspend fun sendDirectMessage(senderId: String, recipientId: String, subject: String?, body: String): MessageSendResultDto
+    suspend fun broadcastMessage(senderId: String, storeId: String?, subject: String?, body: String): MessageSendResultDto
+    suspend fun markMessageRead(userId: String, messageId: String, read: Boolean = true)
+    suspend fun markAllMessagesRead(userId: String): MarkAllReadResultDto
+    suspend fun removeMessage(userId: String, messageId: String)
 }
 
 data class CountSubmission(
@@ -102,4 +111,31 @@ class ConvexInventoryRepository(private val client: ConvexClient) : InventoryRep
     override suspend fun saveUser(args: Map<String, Any?>) { client.mutation<String>("inventory:saveUser", args) }
     override suspend fun syncRuns(userId: String) = query<List<SyncRunDto>>("inventory:syncRuns", mapOf("userId" to userId))
     override suspend fun operationHealth(userId: String) = query<List<OperationHealthDto>>("inventory:cloverOperationHealth", mapOf("userId" to userId))
+    override suspend fun inbox(userId: String, unreadOnly: Boolean, cursor: String?) = query<PageDto<MessageDto>>(
+        "messages:inbox",
+        mapOf("userId" to userId, "unreadOnly" to unreadOnly, "paginationOpts" to paginationArgs(30, cursor)),
+    )
+    override suspend fun sentMessages(userId: String, cursor: String?) = query<PageDto<MessageDto>>(
+        "messages:sent", mapOf("userId" to userId, "paginationOpts" to paginationArgs(30, cursor)),
+    )
+    override suspend fun unreadCount(userId: String) = query<UnreadCountDto>("messages:unreadCount", mapOf("userId" to userId))
+    override suspend fun contacts(userId: String) = query<List<ContactDto>>("messages:contacts", mapOf("userId" to userId))
+    override suspend fun sendDirectMessage(senderId: String, recipientId: String, subject: String?, body: String) =
+        client.mutation<MessageSendResultDto>(
+            "messages:sendDirect",
+            mapOf("senderId" to senderId, "recipientId" to recipientId, "subject" to subject, "body" to body),
+        )
+    override suspend fun broadcastMessage(senderId: String, storeId: String?, subject: String?, body: String) =
+        client.mutation<MessageSendResultDto>(
+            "messages:broadcast",
+            mapOf("senderId" to senderId, "storeId" to storeId, "subject" to subject, "body" to body),
+        )
+    override suspend fun markMessageRead(userId: String, messageId: String, read: Boolean) {
+        client.mutation<MessageReadResultDto>("messages:markRead", mapOf("userId" to userId, "messageId" to messageId, "read" to read))
+    }
+    override suspend fun markAllMessagesRead(userId: String) =
+        client.mutation<MarkAllReadResultDto>("messages:markAllRead", mapOf("userId" to userId))
+    override suspend fun removeMessage(userId: String, messageId: String) {
+        client.mutation<MessageRemovedResultDto>("messages:removeFromInbox", mapOf("userId" to userId, "messageId" to messageId))
+    }
 }
