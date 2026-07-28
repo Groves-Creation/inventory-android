@@ -9,3 +9,8 @@
 
 # JNA also contains desktop-only AWT integration that Android never loads.
 -dontwarn java.awt.**
+
+# The Brother print SDK resolves printer models, settings and native helpers reflectively,
+# so its classes must survive minification intact.
+-keep class com.brother.** { *; }
+-dontwarn com.brother.**

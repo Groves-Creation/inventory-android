@@ -23,8 +23,8 @@ android {
         applicationId = "com.inventory.mobile"
         minSdk = 31
         targetSdk = 36
-        versionCode = 10
-        versionName = "0.3.1"
+        versionCode = 17
+        versionName = "0.3.7"
         buildConfigField("String", "CONVEX_URL", "\"${convexUrl.replace("\"", "\\\"")}\"")
         buildConfigField("String", "UPDATE_REPOSITORY", "\"mtdewwolf/inventory-android\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -32,10 +32,15 @@ android {
 
     signingConfigs {
         create("release") {
-            releaseKeystorePath.orNull?.let { storeFile = file(it) }
-            storePassword = releaseKeystorePassword.orNull
-            keyAlias = releaseKeyAlias.orNull
-            keyPassword = releaseKeyPassword.orNull
+            // CI sets ANDROID_KEYSTORE_* (see .github/workflows/release.yml). Local
+            // assembleRelease without those env vars stays unsigned instead of failing package.
+            val path = releaseKeystorePath.orNull
+            if (path != null) {
+                storeFile = file(path)
+                storePassword = releaseKeystorePassword.orNull
+                keyAlias = releaseKeyAlias.orNull
+                keyPassword = releaseKeyPassword.orNull
+            }
         }
     }
 
@@ -46,7 +51,9 @@ android {
         }
         release {
             isMinifyEnabled = true
-            signingConfig = signingConfigs.getByName("release")
+            if (releaseKeystorePath.orNull != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -57,11 +64,42 @@ android {
     }
 
     packaging.resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+
+    // Compile-only stand-in for BrotherPrintLibrary.aar when -PbrotherStub=true.
+    @Suppress("DEPRECATION")
+    if (providers.gradleProperty("brotherStub").isPresent) {
+        sourceSets.getByName("main").java.srcDir("../brother-stub")
+    }
 }
 
 room {
     schemaDirectory("$projectDir/schemas")
 }
+
+// Brother distributes the print SDK only as a download behind their developer licence, so it
+// cannot be resolved from a repository. Fail early with instructions rather than letting the
+// Kotlin compiler report dozens of unresolved-reference errors.
+val brotherSdkAar = layout.projectDirectory.file("libs/BrotherPrintLibrary.aar")
+val verifyBrotherSdk = tasks.register("verifyBrotherSdk") {
+    val aar = brotherSdkAar.asFile
+    outputs.upToDateWhen { aar.exists() }
+    doLast {
+        if (!aar.exists()) {
+            throw GradleException(
+                """
+                Missing ${aar.relativeTo(rootDir)}.
+
+                Download "Brother Print SDK for Android" (v4.13.0 or newer) from
+                https://support.brother.com/g/s/es/dev/en/mobilesdk/android/index.html
+                and copy BrotherPrintLibrary.aar into app/libs/.
+
+                See the "Label printer" section of README.md.
+                """.trimIndent(),
+            )
+        }
+    }
+}
+if (!providers.gradleProperty("brotherStub").isPresent) tasks.named("preBuild") { dependsOn(verifyBrotherSdk) }
 
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2026.06.00")
@@ -92,6 +130,9 @@ dependencies {
 
     implementation("dev.convex:android-convexmobile:0.8.0@aar") { isTransitive = true }
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
+
+    // Brother Print SDK is not published to any Maven repository; see README "Label printer".
+    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar"))))
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")

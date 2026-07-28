@@ -90,7 +90,9 @@ import java.time.YearMonth
 import java.util.UUID
 
 private enum class Screen(val label: String) {
-    Home("Home"), Items("Items"), Find("Find"), Counts("Count"), More("More"), Settings("Settings"), Labels("Labels"), Variances("Variances"), Reports("Reports"), Audit("Audit"), Admin("Admin"), Inbox("Inbox")
+    Home("Home"), Items("Items"), Find("Find"), Counts("Count"), More("More"), Settings("Settings"), Labels("Labels"),
+    PurchaseOrders("Purchase orders"), Printer("Label printer"), Variances("Variances"), Reports("Reports"), Audit("Audit"),
+    Admin("Admin"), Inbox("Inbox")
 }
 
 private enum class AppBackground(val light: Int, val dark: Int) {
@@ -114,8 +116,9 @@ private fun Screen.background() = when (this) {
     Screen.Find -> AppBackground.Find
     Screen.Counts -> AppBackground.Count
     Screen.More, Screen.Inbox -> AppBackground.More
-    Screen.Settings, Screen.Admin -> AppBackground.Settings
+    Screen.Settings, Screen.Admin, Screen.Printer -> AppBackground.Settings
     Screen.Labels -> AppBackground.Labels
+    Screen.PurchaseOrders -> AppBackground.Items
     Screen.Variances -> AppBackground.Variances
     Screen.Reports -> AppBackground.Reports
     Screen.Audit -> AppBackground.Audit
@@ -425,7 +428,9 @@ private fun InventoryShell(
                 Screen.More -> MoreScreen(user) { screen = it }
                 Screen.Inbox -> InboxScreen(user, store, container.repository, snackbar) { unreadRefresh++ }
                 Screen.Settings -> SettingsScreen(checkingForUpdate, updateCheckMessage, updateChannel, onCheckForUpdates, onUpdateChannelChange)
-                Screen.Labels -> LabelsScreen(user, store.id, container.repository, snackbar)
+                Screen.Labels -> LabelsScreen(user, store.id, container.repository, container.printerStore, container.printer, snackbar)
+                Screen.PurchaseOrders -> PurchaseOrdersScreen(user, store.id, container.repository, container.printerStore, container.printer, snackbar)
+                Screen.Printer -> PrinterSettingsScreen(container.printerStore, container.printer, snackbar)
                 Screen.Variances -> VariancesScreen(user, store.id, container.repository, snackbar)
                 Screen.Reports -> ReportsScreen(user, store.id, container.repository, snackbar)
                 Screen.Audit -> AuditScreen(user, store.id, container.repository, snackbar)
@@ -637,6 +642,8 @@ private fun MoreScreen(user: UserDto, onNavigate: (Screen) -> Unit) {
         add(Screen.Inbox)
         add(Screen.Settings)
         add(Screen.Labels)
+        add(Screen.PurchaseOrders)
+        add(Screen.Printer)
         if (user.canManage()) addAll(listOf(Screen.Variances, Screen.Reports, Screen.Audit))
         if (user.role == "owner") add(Screen.Admin)
     }

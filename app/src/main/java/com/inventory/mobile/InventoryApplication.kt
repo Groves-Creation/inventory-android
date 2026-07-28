@@ -9,7 +9,9 @@ import androidx.work.WorkManager
 import com.inventory.mobile.data.ConvexInventoryRepository
 import com.inventory.mobile.data.CountQueueSync
 import com.inventory.mobile.data.InventoryDatabase
+import com.inventory.mobile.data.PrinterStore
 import com.inventory.mobile.data.SessionStore
+import com.inventory.mobile.print.BrotherLabelPrinter
 import dev.convex.android.ConvexClient
 
 class InventoryApplication : Application() {
@@ -24,6 +26,8 @@ class InventoryApplication : Application() {
             repository = ConvexInventoryRepository(ConvexClient(endpoint)),
             sessionStore = SessionStore(this),
             queueSync = CountQueueSync(this, database.countQueue()),
+            printerStore = PrinterStore(this),
+            printer = BrotherLabelPrinter(this),
             configured = BuildConfig.CONVEX_URL.isNotBlank(),
         )
         enqueueCountSync()
@@ -41,5 +45,7 @@ data class AppContainer(
     val repository: com.inventory.mobile.data.InventoryRepository,
     val sessionStore: SessionStore,
     val queueSync: CountQueueSync,
+    val printerStore: PrinterStore,
+    val printer: BrotherLabelPrinter,
     val configured: Boolean,
 )

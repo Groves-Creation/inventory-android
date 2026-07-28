@@ -178,6 +178,72 @@ data class CloverVarianceDto(
 data class CloverVarianceResultDto(val rows: List<CloverVarianceDto>, val limited: Boolean = false)
 
 @Serializable
+data class PurchaseOrderDto(
+    val id: String,
+    val storeId: String? = null,
+    val reference: String,
+    val vendor: String? = null,
+    val status: String,
+    val note: String? = null,
+    val createdByName: String,
+    val createdAt: String,
+    val receivedAt: String? = null,
+    val receivedByName: String? = null,
+    val lineCount: Double = 0.0,
+    val labelCount: Double = 0.0,
+    val newProductCount: Double = 0.0,
+    val failedLineCount: Double = 0.0,
+) {
+    val isEditable get() = status == "open"
+    val isReceiving get() = status == "receiving"
+}
+
+@Serializable
+data class PurchaseOrderLineDto(
+    val id: String,
+    val itemId: String? = null,
+    val name: String,
+    val sku: String? = null,
+    val code: String? = null,
+    val priceCents: Double,
+    val quantity: Double,
+    val labelCopies: Double,
+    val isNewProduct: Boolean,
+    val status: String,
+    val errorMessage: String? = null,
+)
+
+@Serializable
+data class PurchaseOrderDetailDto(val order: PurchaseOrderDto, val lines: List<PurchaseOrderLineDto>)
+
+@Serializable
+data class LabelRowDto(
+    val lineId: String,
+    val name: String,
+    val priceCents: Double,
+    val code: String,
+    val copies: Double,
+)
+
+@Serializable
+data class LabelSheetDto(val reference: String, val labels: List<LabelRowDto>, val skipped: Double = 0.0)
+
+@Serializable
+data class PurchaseOrderCreatedDto(val id: String, val reference: String)
+
+@Serializable
+data class PurchaseOrderLineCreatedDto(val id: String, val code: String? = null)
+
+@Serializable
+data class ReceiveSummaryDto(val status: String, val created: Double = 0.0, val failed: Double = 0.0)
+
+@Serializable
+data class RemovedResultDto(val removed: Boolean = false)
+
+@Serializable
+data class StatusResultDto(val status: String)
+
+@Serializable
 data class MessageDto(
     val id: String,
     val messageId: String,

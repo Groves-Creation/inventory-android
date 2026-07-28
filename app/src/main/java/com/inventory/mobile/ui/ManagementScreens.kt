@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -38,10 +39,15 @@ import com.inventory.mobile.data.CloverVarianceDto
 import com.inventory.mobile.data.dollarsToCents
 import com.inventory.mobile.data.InventoryRepository
 import com.inventory.mobile.data.ItemDto
+import com.inventory.mobile.data.PrinterSettings
+import com.inventory.mobile.data.PrinterStore
 import com.inventory.mobile.data.ReportRowDto
 import com.inventory.mobile.data.StoreDto
 import com.inventory.mobile.data.UserDto
 import com.inventory.mobile.data.VarianceDto
+import com.inventory.mobile.print.BrotherLabelPrinter
+import com.inventory.mobile.print.LabelSpec
+import com.inventory.mobile.print.PrintOutcome
 import kotlinx.coroutines.launch
 import java.time.YearMonth
 import java.util.UUID
@@ -173,20 +179,49 @@ fun AddItemDialog(
 }
 
 @Composable
-fun LabelsScreen(user: UserDto, storeId: String, repository: InventoryRepository, snackbar: SnackbarHostState) {
+fun LabelsScreen(
+    user: UserDto,
+    storeId: String,
+    repository: InventoryRepository,
+    printerStore: PrinterStore,
+    printer: BrotherLabelPrinter,
+    snackbar: SnackbarHostState,
+) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val printerSettings by printerStore.settings.collectAsState(initial = PrinterSettings())
     var query by remember { mutableStateOf("") }
     var rows by remember { mutableStateOf<List<ItemDto>>(emptyList()) }
+    var printing by remember { mutableStateOf(false) }
     val copies = remember { mutableStateMapOf<String, Int>() }
     LaunchedEffect(storeId, query) {
         if (storeId.isNotBlank()) runCatching { repository.items(user.id, storeId, query) }.onSuccess { rows = it.page }.onFailure { snackbar.showSnackbar(it.message ?: "Unable to load labels") }
     }
+    val chosen = rows.mapNotNull { item -> copies[item.id]?.takeIf { it > 0 }?.let { item to it } }
     Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(query, { query = it }, label = { Text("Search labels") }, modifier = Modifier.fillMaxWidth())
-        Button(
-            enabled = copies.values.sum() > 0,
-            onClick = { shareLabelsPdf(context, rows.mapNotNull { item -> copies[item.id]?.takeIf { it > 0 }?.let { item to it } }) },
-        ) { Text("Print/share ${copies.values.sum()} label(s)") }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                enabled = !printing && chosen.isNotEmpty(),
+                onClick = {
+                    printing = true
+                    scope.launch {
+                        val specs = chosen.map { (item, count) ->
+                            LabelSpec(item.name, item.displayPriceCents.toLong(), item.code.orEmpty(), count)
+                        }
+                        when (val outcome = printer.print(printerSettings, specs)) {
+                            is PrintOutcome.Success -> snackbar.showSnackbar("Sent ${outcome.labels} label(s)")
+                            is PrintOutcome.Failure -> snackbar.showSnackbar(outcome.display)
+                        }
+                        printing = false
+                    }
+                },
+            ) { Text(if (printing) "Printing…" else "Print ${copies.values.sum()} label(s)") }
+            OutlinedButton(
+                enabled = chosen.isNotEmpty(),
+                onClick = { shareLabelsPdf(context, chosen) },
+            ) { Text("Share PDF") }
+        }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(rows.filter { it.code?.matches(Regex("\\d{12}")) == true }, key = { it.id }) { item ->
                 Card(Modifier.fillMaxWidth()) {

@@ -28,6 +28,16 @@ interface InventoryRepository {
     suspend fun saveUser(args: Map<String, Any?>)
     suspend fun syncRuns(userId: String): List<SyncRunDto>
     suspend fun operationHealth(userId: String): List<OperationHealthDto>
+    suspend fun purchaseOrders(userId: String, storeId: String, status: String? = null, cursor: String? = null): PageDto<PurchaseOrderDto>
+    suspend fun purchaseOrder(userId: String, purchaseOrderId: String): PurchaseOrderDetailDto
+    suspend fun labelSheet(userId: String, purchaseOrderId: String): LabelSheetDto
+    suspend fun createPurchaseOrder(userId: String, storeId: String, reference: String, vendor: String?, note: String?): PurchaseOrderCreatedDto
+    suspend fun addExistingItemLine(userId: String, purchaseOrderId: String, itemId: String, quantity: Double, labelCopies: Int?): PurchaseOrderLineCreatedDto
+    suspend fun addNewProductLine(userId: String, purchaseOrderId: String, name: String, priceCents: Double, sku: String?, code: String?, quantity: Double, labelCopies: Int?): PurchaseOrderLineCreatedDto
+    suspend fun updatePurchaseOrderLine(args: Map<String, Any?>)
+    suspend fun removePurchaseOrderLine(userId: String, lineId: String)
+    suspend fun cancelPurchaseOrder(userId: String, purchaseOrderId: String)
+    suspend fun receivePurchaseOrder(userId: String, purchaseOrderId: String): ReceiveSummaryDto
     suspend fun inbox(userId: String, unreadOnly: Boolean = false, cursor: String? = null): PageDto<MessageDto>
     suspend fun sentMessages(userId: String, cursor: String? = null): PageDto<MessageDto>
     suspend fun unreadCount(userId: String): UnreadCountDto
@@ -111,6 +121,67 @@ class ConvexInventoryRepository(private val client: ConvexClient) : InventoryRep
     override suspend fun saveUser(args: Map<String, Any?>) { client.mutation<String>("inventory:saveUser", args) }
     override suspend fun syncRuns(userId: String) = query<List<SyncRunDto>>("inventory:syncRuns", mapOf("userId" to userId))
     override suspend fun operationHealth(userId: String) = query<List<OperationHealthDto>>("inventory:cloverOperationHealth", mapOf("userId" to userId))
+    override suspend fun purchaseOrders(userId: String, storeId: String, status: String?, cursor: String?): PageDto<PurchaseOrderDto> {
+        val args = mutableMapOf<String, Any?>("userId" to userId, "storeId" to storeId, "paginationOpts" to paginationArgs(30, cursor))
+        status?.let { args["status"] = it }
+        return query("purchaseOrders:listPurchaseOrders", args)
+    }
+    override suspend fun purchaseOrder(userId: String, purchaseOrderId: String) = query<PurchaseOrderDetailDto>(
+        "purchaseOrders:purchaseOrder", mapOf("userId" to userId, "purchaseOrderId" to purchaseOrderId),
+    )
+    override suspend fun labelSheet(userId: String, purchaseOrderId: String) = query<LabelSheetDto>(
+        "purchaseOrders:labelSheet", mapOf("userId" to userId, "purchaseOrderId" to purchaseOrderId),
+    )
+    override suspend fun createPurchaseOrder(userId: String, storeId: String, reference: String, vendor: String?, note: String?) =
+        client.mutation<PurchaseOrderCreatedDto>(
+            "purchaseOrders:createPurchaseOrder",
+            mapOf("userId" to userId, "storeId" to storeId, "reference" to reference, "vendor" to vendor, "note" to note),
+        )
+    override suspend fun addExistingItemLine(userId: String, purchaseOrderId: String, itemId: String, quantity: Double, labelCopies: Int?) =
+        client.mutation<PurchaseOrderLineCreatedDto>(
+            "purchaseOrders:addExistingItemLine",
+            mapOf(
+                "userId" to userId,
+                "purchaseOrderId" to purchaseOrderId,
+                "itemId" to itemId,
+                "quantity" to quantity,
+                "labelCopies" to labelCopies?.toDouble(),
+            ),
+        )
+    override suspend fun addNewProductLine(
+        userId: String,
+        purchaseOrderId: String,
+        name: String,
+        priceCents: Double,
+        sku: String?,
+        code: String?,
+        quantity: Double,
+        labelCopies: Int?,
+    ) = client.mutation<PurchaseOrderLineCreatedDto>(
+        "purchaseOrders:addNewProductLine",
+        mapOf(
+            "userId" to userId,
+            "purchaseOrderId" to purchaseOrderId,
+            "name" to name,
+            "priceCents" to priceCents,
+            "sku" to sku,
+            "code" to code,
+            "quantity" to quantity,
+            "labelCopies" to labelCopies?.toDouble(),
+        ),
+    )
+    override suspend fun updatePurchaseOrderLine(args: Map<String, Any?>) {
+        client.mutation<PurchaseOrderLineCreatedDto>("purchaseOrders:updatePurchaseOrderLine", args)
+    }
+    override suspend fun removePurchaseOrderLine(userId: String, lineId: String) {
+        client.mutation<RemovedResultDto>("purchaseOrders:removePurchaseOrderLine", mapOf("userId" to userId, "lineId" to lineId))
+    }
+    override suspend fun cancelPurchaseOrder(userId: String, purchaseOrderId: String) {
+        client.mutation<StatusResultDto>("purchaseOrders:cancelPurchaseOrder", mapOf("userId" to userId, "purchaseOrderId" to purchaseOrderId))
+    }
+    override suspend fun receivePurchaseOrder(userId: String, purchaseOrderId: String) = client.action<ReceiveSummaryDto>(
+        "purchaseOrderActions:receivePurchaseOrder", mapOf("userId" to userId, "purchaseOrderId" to purchaseOrderId),
+    )
     override suspend fun inbox(userId: String, unreadOnly: Boolean, cursor: String?) = query<PageDto<MessageDto>>(
         "messages:inbox",
         mapOf("userId" to userId, "unreadOnly" to unreadOnly, "paginationOpts" to paginationArgs(30, cursor)),
