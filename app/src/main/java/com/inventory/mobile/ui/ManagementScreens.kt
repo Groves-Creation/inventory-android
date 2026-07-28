@@ -11,7 +11,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -224,7 +223,7 @@ fun LabelsScreen(
         }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(rows.filter { it.code?.matches(Regex("\\d{12}")) == true }, key = { it.id }) { item ->
-                Card(Modifier.fillMaxWidth()) {
+                AppCard(Modifier.fillMaxWidth()) {
                     Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Column(Modifier.weight(1f)) { Text(item.name, fontWeight = FontWeight.Bold); Text(item.code.orEmpty()) }
                         OutlinedButton(onClick = { copies[item.id] = (copies[item.id] ?: 0).minus(1).coerceAtLeast(0) }) { Text("−") }
@@ -289,7 +288,7 @@ fun VariancesScreen(user: UserDto, storeId: String, repository: InventoryReposit
             if (cloverComparisonLimited) Text("This checks up to 500 Clover items at a time. Missing-from-Convex results are accurate; run a Clover sync before relying on missing-from-Clover results.")
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(cloverRows, key = { "${it.kind}_${it.cloverId}" }) { variance ->
-                    Card(Modifier.fillMaxWidth()) {
+                    AppCard(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(variance.itemName, fontWeight = FontWeight.Bold)
                             Text(when (variance.kind) { "missing_in_convex" -> "Missing from Convex"; "missing_in_clover" -> "Missing from Clover"; "archived_in_convex" -> "Archived in Convex"; else -> "Price or quantity differs" })
@@ -315,7 +314,7 @@ fun VariancesScreen(user: UserDto, storeId: String, repository: InventoryReposit
         }) { Text("Apply loaded (${rows.size})") }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(rows, key = { it.id }) { variance ->
-                Card(Modifier.fillMaxWidth()) {
+                AppCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(variance.itemName, fontWeight = FontWeight.Bold)
                         Text("Expected ${variance.expectedQty ?: "N/T"} · counted ${variance.countedQty} · variance ${variance.variance}")
@@ -405,7 +404,7 @@ fun AuditScreen(user: UserDto, storeId: String, repository: InventoryRepository,
             }
         }) { Text("Export CSV") }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(rows, key = { it.id }) { row -> Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { Text(row.description); Text(row.ts, style = MaterialTheme.typography.labelSmall) } } }
+            items(rows, key = { it.id }) { row -> AppCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { Text(row.description); Text(row.ts, style = MaterialTheme.typography.labelSmall) } } }
         }
     }
 }
@@ -450,7 +449,7 @@ fun AdminScreen(user: UserDto, repository: InventoryRepository, snackbar: Snackb
     LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item { Button(onClick = { adding = true }) { Text("Add user") } }
         items(users, key = { it.id }) { admin ->
-            Card(Modifier.fillMaxWidth()) {
+            AppCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("${admin.name} · ${admin.role} · ${if (admin.active) "active" else "inactive"}", fontWeight = FontWeight.Bold)
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -474,7 +473,7 @@ fun AdminScreen(user: UserDto, repository: InventoryRepository, snackbar: Snackb
         items(runs.take(20), key = { it.id }) { run -> Text("${run.storeName}: ${run.status} · ${run.itemsUpserted} updated, ${run.itemsTombstoned} removed") }
         item { Text("Clover write recovery", style = MaterialTheme.typography.titleMedium) }
         items(health, key = { it.requestId }) { operation ->
-            Card(Modifier.fillMaxWidth()) {
+            AppCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("${operation.storeName}: ${operation.kind} · ${operation.status}", fontWeight = FontWeight.Bold)
                     Text(operation.errorMessage ?: "Requires attention")

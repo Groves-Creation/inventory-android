@@ -3,6 +3,7 @@ package com.inventory.mobile.ui
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -32,13 +33,13 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -48,8 +49,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -94,68 +94,6 @@ private enum class Screen(val label: String) {
     PurchaseOrders("Purchase orders"), Printer("Label printer"), Variances("Variances"), Reports("Reports"), Audit("Audit"),
     Admin("Admin"), Inbox("Inbox")
 }
-
-private enum class AppBackground(val light: Int, val dark: Int) {
-    Login(R.drawable.background_login_light, R.drawable.background_login_dark),
-    Store(R.drawable.background_store_light, R.drawable.background_store_dark),
-    Home(R.drawable.background_home_light, R.drawable.background_home_dark),
-    Items(R.drawable.background_items_light, R.drawable.background_items_dark),
-    Find(R.drawable.background_find_light, R.drawable.background_find_dark),
-    Count(R.drawable.background_count_light, R.drawable.background_count_dark),
-    More(R.drawable.background_more_light, R.drawable.background_more_dark),
-    Settings(R.drawable.background_settings_light, R.drawable.background_settings_dark),
-    Labels(R.drawable.background_labels_light, R.drawable.background_labels_dark),
-    Variances(R.drawable.background_variances_light, R.drawable.background_variances_dark),
-    Reports(R.drawable.background_reports_light, R.drawable.background_reports_dark),
-    Audit(R.drawable.background_audit_light, R.drawable.background_audit_dark),
-}
-
-private fun Screen.background() = when (this) {
-    Screen.Home -> AppBackground.Home
-    Screen.Items -> AppBackground.Items
-    Screen.Find -> AppBackground.Find
-    Screen.Counts -> AppBackground.Count
-    Screen.More, Screen.Inbox -> AppBackground.More
-    Screen.Settings, Screen.Admin, Screen.Printer -> AppBackground.Settings
-    Screen.Labels -> AppBackground.Labels
-    Screen.PurchaseOrders -> AppBackground.Items
-    Screen.Variances -> AppBackground.Variances
-    Screen.Reports -> AppBackground.Reports
-    Screen.Audit -> AppBackground.Audit
-}
-
-@Composable
-private fun ScreenBackground(background: AppBackground, darkMode: Boolean, modifier: Modifier = Modifier) {
-    Image(
-        painter = painterResource(if (darkMode) background.dark else background.light),
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
-        modifier = modifier.fillMaxSize(),
-        alpha = if (darkMode) 0.48f else 0.62f,
-    )
-}
-
-private val pilotLightColors = lightColorScheme(
-    primary = Color(0xFF146C5A),
-    secondary = Color(0xFF52616B),
-    error = Color(0xFFB3261E),
-    background = Color(0xFFF5F7FA),
-    surface = Color.White,
-)
-
-private val pilotDarkColors = darkColorScheme(
-    primary = Color(0xFF5BD0C0),
-    onPrimary = Color(0xFF00372F),
-    secondary = Color(0xFFA8B5BB),
-    background = Color(0xFF0F1518),
-    surface = Color(0xFF182126),
-    surfaceVariant = Color(0xFF263238),
-    onBackground = Color(0xFFEAF1F3),
-    onSurface = Color(0xFFEAF1F3),
-    onSurfaceVariant = Color(0xFFC7D1D5),
-    outline = Color(0xFF71858E),
-    error = Color(0xFFFFB4AB),
-)
 
 @Composable
 fun InventoryApp(container: AppContainer, onInstallUpdate: (AvailableUpdate) -> Unit) {
@@ -211,7 +149,13 @@ fun InventoryApp(container: AppContainer, onInstallUpdate: (AvailableUpdate) -> 
     }
     MaterialTheme(colorScheme = colorScheme) {
         if (!container.configured) {
-            Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center,
+            ) {
                 Text("Missing INVENTORY_CONVEX_URL. Add it to ~/.gradle/gradle.properties or pass -PINVENTORY_CONVEX_URL=https://…convex.cloud.")
             }
         } else if (user == null) {
@@ -278,12 +222,17 @@ private fun StoreSelectionScreen(
             .onFailure { error = it.message ?: "Unable to load stores" }
         loading = false
     }
-    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        ScreenBackground(AppBackground.Store, darkMode)
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
         IconButton(onClick = onToggleDarkMode, modifier = Modifier.align(Alignment.TopEnd)) {
             Icon(if (darkMode) Icons.Default.LightMode else Icons.Default.DarkMode, if (darkMode) "Switch to light mode" else "Switch to dark mode")
         }
-        Card(Modifier.fillMaxWidth()) {
+        AppCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Image(
                     painter = painterResource(R.drawable.inventory_welcome),
@@ -317,12 +266,17 @@ private fun LoginScreen(repository: InventoryRepository, darkMode: Boolean, onTo
     LaunchedEffect(Unit) {
         runCatching { repository.loginUsers() }.onSuccess { users = it }.onFailure { error = it.message }
     }
-    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        ScreenBackground(AppBackground.Login, darkMode)
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
         IconButton(onClick = onToggleDarkMode, modifier = Modifier.align(Alignment.TopEnd)) {
             Icon(if (darkMode) Icons.Default.LightMode else Icons.Default.DarkMode, if (darkMode) "Switch to light mode" else "Switch to dark mode")
         }
-        Card(Modifier.fillMaxWidth()) {
+        AppCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("LIT Super Smoke Shop", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Text("Internal pilot — PIN access is not a production security boundary.", color = MaterialTheme.colorScheme.error)
@@ -384,13 +338,15 @@ private fun InventoryShell(
         runCatching { container.repository.unreadCount(user.id) }
             .onSuccess { unread = it.count.toInt(); unreadCapped = it.hasMore }
     }
-    Box(Modifier.fillMaxSize()) {
-        ScreenBackground(screen.background(), darkMode)
-        Scaffold(
-        containerColor = Color.Transparent,
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ),
                 title = { Column { Text(screen.label); Text("${store.name} · ${user.name} · ${user.role}", style = MaterialTheme.typography.labelSmall) } },
                 actions = {
                     IconButton(onClick = { screen = Screen.Inbox }) {
@@ -406,7 +362,10 @@ private fun InventoryShell(
             )
         },
         bottomBar = {
-            NavigationBar {
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = NavigationBarDefaults.Elevation,
+            ) {
                 listOf(
                     Triple(Screen.Home, Icons.Default.Home, "Home"),
                     Triple(Screen.Items, Icons.Default.Inventory2, "Items"),
@@ -417,7 +376,7 @@ private fun InventoryShell(
                     NavigationBarItem(selected = screen == target, onClick = { screen = target }, icon = { Icon(icon, label) }, label = { Text(label) })
                 }
             }
-        },
+        }
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when (screen) {
@@ -436,7 +395,6 @@ private fun InventoryShell(
                 Screen.Audit -> AuditScreen(user, store.id, container.repository, snackbar)
                 Screen.Admin -> AdminScreen(user, container.repository, snackbar)
             }
-        }
         }
     }
     if (showingExitChoices) {
@@ -479,7 +437,7 @@ private fun HomeScreen(user: UserDto, store: StoreDto, repository: InventoryRepo
     }
     ScreenList(loading = loading) {
         items(stores, key = { it.id }) { store ->
-            Card(Modifier.fillMaxWidth()) {
+            AppCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(store.name, style = MaterialTheme.typography.titleLarge)
                     Text("${store.itemCount ?: 0} items · ${store.counted ?: 0}/${store.total ?: store.itemCount ?: 0} counted")
@@ -553,7 +511,7 @@ private fun FindScreen(user: UserDto, store: StoreDto, repository: InventoryRepo
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(rows.filter { group -> group.stores.any { it.storeId == store.id } }) { group ->
-                Card(Modifier.fillMaxWidth()) {
+                AppCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
                         Text(group.name, fontWeight = FontWeight.Bold)
                         Text("${group.sku ?: group.code ?: "No SKU"} · ${money(group.priceCents)}")
@@ -622,7 +580,7 @@ private fun CountsScreen(user: UserDto, store: StoreDto, repository: InventoryRe
 @Composable
 private fun QueuedCountCard(entry: QueuedCount, queue: CountQueueSync, repository: InventoryRepository, snackbar: SnackbarHostState) {
     val scope = rememberCoroutineScope()
-    Card(Modifier.fillMaxWidth()) {
+    AppCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("${entry.itemName}: ${entry.countedQty}", fontWeight = FontWeight.Bold)
             if (entry.state == "conflict") {

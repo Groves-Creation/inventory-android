@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -134,7 +133,7 @@ fun PrinterSettingsScreen(
             }
         }
         items(found, key = { it.ipAddress }) { discovered ->
-            Card(Modifier.fillMaxWidth()) {
+            AppCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(discovered.modelName.ifBlank { "Brother printer" }, fontWeight = FontWeight.Bold)
                     Text(discovered.ipAddress, style = MaterialTheme.typography.bodySmall)
