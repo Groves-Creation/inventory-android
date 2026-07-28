@@ -6,4 +6,8 @@ import kotlin.math.round
 internal fun paginationArgs(pageSize: Int, cursor: String?): Map<String, Any?> =
     mapOf("numItems" to pageSize.toDouble(), "cursor" to cursor)
 
+/** Convex v.optional() accepts omitted fields, not explicit JSON null. */
+internal fun mutationArgs(vararg pairs: Pair<String, Any?>): Map<String, Any?> =
+    buildMap { pairs.forEach { (key, value) -> if (value != null) put(key, value) } }
+
 internal fun dollarsToCents(value: Double): Double = round(value * 100.0)

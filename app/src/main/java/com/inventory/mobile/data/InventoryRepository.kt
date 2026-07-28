@@ -135,12 +135,18 @@ class ConvexInventoryRepository(private val client: ConvexClient) : InventoryRep
     override suspend fun createPurchaseOrder(userId: String, storeId: String, reference: String, vendor: String?, note: String?) =
         client.mutation<PurchaseOrderCreatedDto>(
             "purchaseOrders:createPurchaseOrder",
-            mapOf("userId" to userId, "storeId" to storeId, "reference" to reference, "vendor" to vendor, "note" to note),
+            mutationArgs(
+                "userId" to userId,
+                "storeId" to storeId,
+                "reference" to reference,
+                "vendor" to vendor,
+                "note" to note,
+            ),
         )
     override suspend fun addExistingItemLine(userId: String, purchaseOrderId: String, itemId: String, quantity: Double, labelCopies: Int?) =
         client.mutation<PurchaseOrderLineCreatedDto>(
             "purchaseOrders:addExistingItemLine",
-            mapOf(
+            mutationArgs(
                 "userId" to userId,
                 "purchaseOrderId" to purchaseOrderId,
                 "itemId" to itemId,
@@ -159,7 +165,7 @@ class ConvexInventoryRepository(private val client: ConvexClient) : InventoryRep
         labelCopies: Int?,
     ) = client.mutation<PurchaseOrderLineCreatedDto>(
         "purchaseOrders:addNewProductLine",
-        mapOf(
+        mutationArgs(
             "userId" to userId,
             "purchaseOrderId" to purchaseOrderId,
             "name" to name,
@@ -171,7 +177,10 @@ class ConvexInventoryRepository(private val client: ConvexClient) : InventoryRep
         ),
     )
     override suspend fun updatePurchaseOrderLine(args: Map<String, Any?>) {
-        client.mutation<PurchaseOrderLineCreatedDto>("purchaseOrders:updatePurchaseOrderLine", args)
+        client.mutation<PurchaseOrderLineCreatedDto>(
+            "purchaseOrders:updatePurchaseOrderLine",
+            args.filterValues { it != null },
+        )
     }
     override suspend fun removePurchaseOrderLine(userId: String, lineId: String) {
         client.mutation<RemovedResultDto>("purchaseOrders:removePurchaseOrderLine", mapOf("userId" to userId, "lineId" to lineId))
