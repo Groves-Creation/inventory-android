@@ -48,6 +48,7 @@ fun BarcodeScannerDialog(onResult: (String) -> Unit, onDismiss: () -> Unit) {
     val previewView = remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
     val executor = remember { Executors.newSingleThreadExecutor() }
     val delivered = remember { AtomicBoolean(false) }
+    var cameraError by remember { mutableStateOf<String?>(null) }
     val scanner = remember {
         BarcodeScanning.getClient(
             BarcodeScannerOptions.Builder().setBarcodeFormats(
@@ -81,26 +82,40 @@ fun BarcodeScannerDialog(onResult: (String) -> Unit, onDismiss: () -> Unit) {
             val future = ProcessCameraProvider.getInstance(context)
             future.addListener({
                 if (disposed.get()) return@addListener
-                val cameraProvider = future.get()
+                val cameraProvider = runCatching { future.get() }.getOrElse {
+                    cameraError = "Camera could not be started on this device."
+                    return@addListener
+                }
                 val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
                 val analysis = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build()
                 analysis.setAnalyzer(executor) { proxy ->
                     val media = proxy.image
-                    if (media == null || delivered.get()) {
+                    if (media == null || delivered.get() || disposed.get()) {
                         proxy.close()
                     } else {
-                        scanner.process(InputImage.fromMediaImage(media, proxy.imageInfo.rotationDegrees))
+                        // Device camera implementations can occasionally provide a malformed
+                        // frame. Keep that failure inside the analyzer so it cannot take down
+                        // the process, and always release the frame back to CameraX.
+                        runCatching {
+                            scanner.process(InputImage.fromMediaImage(media, proxy.imageInfo.rotationDegrees))
+                        }.onFailure {
+                            proxy.close()
+                        }.getOrNull()?.let { task ->
+                            task
                             .addOnSuccessListener { barcodes ->
                                 val value = barcodes.firstNotNullOfOrNull { it.rawValue?.takeIf(String::isNotBlank) }
                                 if (value != null && delivered.compareAndSet(false, true)) onResult(value)
                             }
                             .addOnCompleteListener { proxy.close() }
+                        }
                     }
                 }
                 runCatching {
                     cameraProvider.unbindAll()
                     cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
                     boundProvider = cameraProvider
+                }.onFailure {
+                    cameraError = "Camera could not be opened. Check that it is available and try again."
                 }
             }, ContextCompat.getMainExecutor(context))
             onDispose {
@@ -117,6 +132,7 @@ fun BarcodeScannerDialog(onResult: (String) -> Unit, onDismiss: () -> Unit) {
             Column {
                 if (granted) AndroidView(factory = { previewView }, modifier = Modifier.fillMaxWidth().aspectRatio(3f / 4f))
                 else Button(onClick = { permission.launch(Manifest.permission.CAMERA) }) { Text("Allow camera") }
+                cameraError?.let { Text(it) }
                 Text("Hardware scanners can also type directly into any search field.")
             }
         },
