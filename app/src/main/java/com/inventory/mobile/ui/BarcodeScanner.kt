@@ -61,12 +61,26 @@ fun BarcodeScannerDialog(onResult: (String) -> Unit, onDismiss: () -> Unit) {
             ).build(),
         )
     }
-    var provider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+    // The permission result changes `granted`, so camera binding must be a separate
+    // effect from the lifetime of ML Kit and its executor.  Previously, granting the
+    // permission disposed this effect and closed both resources before the listener
+    // below could use them.
+    DisposableEffect(Unit) {
+        onDispose {
+            scanner.close()
+            executor.shutdown()
+        }
+    }
 
     DisposableEffect(granted, lifecycleOwner) {
-        if (granted) {
+        if (!granted) {
+            onDispose { }
+        } else {
+            val disposed = AtomicBoolean(false)
+            var boundProvider: ProcessCameraProvider? = null
             val future = ProcessCameraProvider.getInstance(context)
             future.addListener({
+                if (disposed.get()) return@addListener
                 val cameraProvider = future.get()
                 val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
                 val analysis = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build()
@@ -86,14 +100,13 @@ fun BarcodeScannerDialog(onResult: (String) -> Unit, onDismiss: () -> Unit) {
                 runCatching {
                     cameraProvider.unbindAll()
                     cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
-                    provider = cameraProvider
+                    boundProvider = cameraProvider
                 }
             }, ContextCompat.getMainExecutor(context))
-        }
-        onDispose {
-            provider?.unbindAll()
-            scanner.close()
-            executor.shutdown()
+            onDispose {
+                disposed.set(true)
+                boundProvider?.unbindAll()
+            }
         }
     }
 
