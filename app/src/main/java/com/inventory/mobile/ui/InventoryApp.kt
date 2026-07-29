@@ -502,8 +502,8 @@ private fun FindScreen(user: UserDto, store: StoreDto, repository: InventoryRepo
     var cursor by remember { mutableStateOf<String?>(null) }
     var isDone by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
-    LaunchedEffect(query) {
-        if (query.trim().length >= 2) runCatching { repository.find(user.id, query) }.onSuccess { rows = it.page; cursor = it.continueCursor; isDone = it.isDone }.onFailure { error = it.message }
+    LaunchedEffect(store.id, query) {
+        if (query.trim().length >= 2) runCatching { repository.find(user.id, store.id, query) }.onSuccess { rows = it.page; cursor = it.continueCursor; isDone = it.isDone }.onFailure { error = it.message }
         else rows = emptyList()
     }
     Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -522,7 +522,7 @@ private fun FindScreen(user: UserDto, store: StoreDto, repository: InventoryRepo
         }
         if (!isDone) OutlinedButton(onClick = {
             scope.launch {
-                runCatching { repository.find(user.id, query, cursor) }.onSuccess { page ->
+                runCatching { repository.find(user.id, store.id, query, cursor) }.onSuccess { page ->
                     rows = rows + page.page
                     cursor = page.continueCursor
                     isDone = page.isDone
